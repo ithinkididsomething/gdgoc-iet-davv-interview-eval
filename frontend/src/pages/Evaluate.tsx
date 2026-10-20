@@ -11,6 +11,7 @@ import {
   setMeta,
 } from '../lib/idb';
 import { useOnline } from '../lib/net';
+import { scheduleSheetSync } from '../lib/sheetSync';
 import { meanOf, displayScore } from '../lib/rubric';
 import { useSync } from '../lib/syncContext';
 import type { Candidate, Criterion, EvaluationWithScores, OutboxItem, Round, Vertical } from '../lib/types';
@@ -278,6 +279,7 @@ export function Evaluate() {
           }),
         });
         if (res.status === 'ok') {
+          scheduleSheetSync(getToken);
           setMessage({
             kind: 'ok',
             text: serverEvalId

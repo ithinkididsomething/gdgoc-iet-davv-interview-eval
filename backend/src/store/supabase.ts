@@ -1122,39 +1122,32 @@ export class SupabaseStore implements Store {
     row_key: string;
     payload: Record<string, unknown>;
   }): Promise<void> {
-    const { data: existing } = await this.sb
-      .from('sync_queue')
-      .select('*')
-      .eq('direction', item.direction)
-      .eq('entity_type', item.entity_type)
-      .eq('entity_id', item.entity_id)
-      .eq('status', 'pending')
-      .limit(1)
-      .maybeSingle();
-    if (existing) {
-      const { error } = await this.sb
-        .from('sync_queue')
-        .update({ payload: item.payload, worksheet: item.worksheet, row_key: item.row_key, updated_at: new Date().toISOString() })
-        .eq('id', existing.id);
-      if (error) throw new Error(`enqueueSpreadsheetSync: ${error.message}`);
-      return;
-    }
-    const { error } = await this.sb.from('sync_queue').insert({
-      direction: item.direction,
-      entity_type: item.entity_type,
-      entity_id: item.entity_id,
-      worksheet: item.worksheet,
-      row_key: item.row_key,
-      payload: item.payload,
-      status: 'pending',
-      attempts: 0,
-    });
+    // One queue row per entity (unique index), regardless of its previous
+    // status: a finished/failed row is re-armed with the latest payload.
+    // Upsert avoids the select-then-insert race when several judges submit for
+    // the same candidate at the same moment.
+    const { error } = await this.sb.from('spreadsheet_sync_queue').upsert(
+      {
+        direction: item.direction,
+        entity_type: item.entity_type,
+        entity_id: item.entity_id,
+        worksheet: item.worksheet,
+        row_key: item.row_key,
+        payload: item.payload,
+        status: 'pending',
+        attempts: 0,
+        last_error: '',
+        conflict: null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'direction,entity_type,entity_id' },
+    );
     if (error) throw new Error(`enqueueSpreadsheetSync: ${error.message}`);
   }
   async claimSpreadsheetSync(limit: number): Promise<SpreadsheetSyncItem[]> {
     const stale = new Date(Date.now() - 60_000).toISOString();
     const { data, error } = await this.sb
-      .from('sync_queue')
+      .from('spreadsheet_sync_queue')
       .select('*')
       .or(`status.eq.pending,and(status.eq.in_flight,updated_at.lt.${stale})`)
       .order('created_at')
@@ -1162,21 +1155,39 @@ export class SupabaseStore implements Store {
     if (error) throw new Error(`claimSpreadsheetSync: ${error.message}`);
     const rows = (data ?? []) as SpreadsheetSyncItem[];
     if (rows.length === 0) return [];
-    const { data: claimed, error: cErr } = await this.sb
-      .from('sync_queue')
-      .update({ status: 'in_flight', updated_at: new Date().toISOString() })
-      .in(
-        'id',
-        rows.map((r) => r.id),
-      )
-      .select('*');
-    if (cErr) throw new Error(`claimSpreadsheetSync: ${cErr.message}`);
-    return (claimed ?? []) as SpreadsheetSyncItem[];
+    // Two concurrent drains can select the same candidates; only the update
+    // that still matches the expected status actually owns each row.
+    const now = new Date().toISOString();
+    const claimed: SpreadsheetSyncItem[] = [];
+    const pendingIds = rows.filter((r) => r.status === 'pending').map((r) => r.id);
+    const staleIds = rows.filter((r) => r.status === 'in_flight').map((r) => r.id);
+    if (pendingIds.length) {
+      const { data: c, error: cErr } = await this.sb
+        .from('spreadsheet_sync_queue')
+        .update({ status: 'in_flight', updated_at: now })
+        .in('id', pendingIds)
+        .eq('status', 'pending')
+        .select('*');
+      if (cErr) throw new Error(`claimSpreadsheetSync: ${cErr.message}`);
+      claimed.push(...((c ?? []) as SpreadsheetSyncItem[]));
+    }
+    if (staleIds.length) {
+      const { data: c, error: cErr } = await this.sb
+        .from('spreadsheet_sync_queue')
+        .update({ status: 'in_flight', updated_at: now })
+        .in('id', staleIds)
+        .eq('status', 'in_flight')
+        .lt('updated_at', stale)
+        .select('*');
+      if (cErr) throw new Error(`claimSpreadsheetSync: ${cErr.message}`);
+      claimed.push(...((c ?? []) as SpreadsheetSyncItem[]));
+    }
+    return claimed;
   }
   async completeSpreadsheetSync(
     id: string,
-    status: 'done' | 'failed' | 'conflict',
-    detail: { error?: string; conflict?: Record<string, unknown> },
+    status: 'done' | 'failed' | 'conflict' | 'pending',
+    detail: { error?: string; conflict?: Record<string, unknown>; attempts?: number },
   ): Promise<void> {
     const patch: Record<string, unknown> = {
       status,
@@ -1184,12 +1195,19 @@ export class SupabaseStore implements Store {
       conflict: detail.conflict ?? null,
       updated_at: new Date().toISOString(),
     };
+    if (detail.attempts !== undefined) patch.attempts = detail.attempts;
     if (status === 'done') patch.payload = {};
-    const { error } = await this.sb.from('sync_queue').update(patch).eq('id', id);
+    // A newer evaluation may have re-armed this row (pending) while the write
+    // was in flight; never mark that newer payload as done.
+    const { error } = await this.sb
+      .from('spreadsheet_sync_queue')
+      .update(patch)
+      .eq('id', id)
+      .eq('status', 'in_flight');
     if (error) throw new Error(`completeSpreadsheetSync: ${error.message}`);
   }
   async listSpreadsheetSync(status?: string): Promise<SpreadsheetSyncItem[]> {
-    let q = this.sb.from('sync_queue').select('*').order('created_at');
+    let q = this.sb.from('spreadsheet_sync_queue').select('*').order('created_at');
     if (status) q = q.eq('status', status);
     return unwrap(await q, 'listSpreadsheetSync') as SpreadsheetSyncItem[];
   }

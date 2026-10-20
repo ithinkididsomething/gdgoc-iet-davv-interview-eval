@@ -1,8 +1,14 @@
-import { columnIndex, ensureTab, findRowByKey, readTab, spreadsheetUrl, writeBatch, appendRow, isConfigured, listTabs, parseSheetLink, overwriteTab, sanitizeTabTitle, SheetsUnavailableError } from '../sheets/googleSheets.js';
+import { columnIndex, ensureTab, findRowByKey, readTab, spreadsheetUrl, writeBatch, appendRows, isConfigured, listTabs, parseSheetLink, overwriteTab, sanitizeTabTitle, SheetsUnavailableError } from '../sheets/googleSheets.js';
 import type { SheetsConnectionConfig } from '../sheets/googleSheets.js';
 import { COLUMN_ALIASES, normalizeHeader } from '../importer/columns.js';
 import type { AppConfig } from '../../config.js';
-import type { Store, ResultRow, Candidate, SpreadsheetSyncItem } from '../../store/types.js';
+import type {
+  Store,
+  ResultRow,
+  Candidate,
+  EvaluationWithScores,
+  SpreadsheetSyncItem,
+} from '../../store/types.js';
 
 /**
  * Two-way spreadsheet sync.
@@ -16,7 +22,7 @@ import type { Store, ResultRow, Candidate, SpreadsheetSyncItem } from '../../sto
 
 export interface SyncRunSummary {
   pulled: { worksheet: string; created: number; updated: number; skipped: number; errors: number }[];
-  pushed: { id: string; status: 'done' | 'failed' | 'conflict'; detail?: string }[];
+  pushed: { id: string; status: 'done' | 'failed' | 'conflict' | 'pending'; detail?: string }[];
   skipped: string[];
   connection_ok: boolean;
   error?: string;
@@ -159,12 +165,51 @@ export async function pullFromSheets(store: Store, config: AppConfig, actorId: s
   return summary;
 }
 
-/** Build one sheet row for an evaluation queue item. */
-function evaluationRow(item: SpreadsheetSyncItem, results: Map<string, ResultRow>): unknown[] | null {
-  const row = results.get(item.entity_id);
-  if (!row) return null;
+/**
+ * Every judge's recommended vertical for a candidate, e.g.
+ * "Technical (Parth), Design (Yash)". Ordered oldest-first for stable output.
+ */
+function preferredVerticalLabels(
+  evaluations: EvaluationWithScores[],
+  verticalNames: Map<string, string>,
+): Map<string, string[]> {
+  const preferences = new Map<string, string[]>();
+  for (const e of [...evaluations].sort((a, b) => a.submitted_at.localeCompare(b.submitted_at))) {
+    if (!e.preferred_vertical_id) continue;
+    const name = verticalNames.get(e.preferred_vertical_id);
+    if (!name) continue;
+    const label = e.judge_name ? `${name} (${e.judge_name})` : name;
+    const list = preferences.get(e.candidate_id) ?? [];
+    list.push(label);
+    preferences.set(e.candidate_id, list);
+  }
+  return preferences;
+}
+
+/** Columns M-S: the evaluation block shared by exports and queue pushes. */
+function evaluationValues(row: ResultRow | undefined, preferences: string[]): unknown[] {
+  if (!row) return ['', '', '', '', '', '', preferences.join(', ')];
   const judgeCount = row.judge_ratings.length;
   const individualScores = row.judge_ratings.map((j) => (j.score === null ? '' : Number(j.score)));
+  return [
+    row.evaluation_count,
+    row.expected_evaluations,
+    row.is_provisional ? 'provisional' : row.evaluation_status,
+    individualScores.join(' | '),
+    row.average_score === null ? '' : row.average_score,
+    judgeCount,
+    preferences.join(', '),
+  ];
+}
+
+/** Build one sheet row for an evaluation queue item. */
+function evaluationRow(
+  item: SpreadsheetSyncItem,
+  results: Map<string, ResultRow>,
+  preferences: Map<string, string[]>,
+): unknown[] | null {
+  const row = results.get(item.entity_id);
+  if (!row) return null;
   return [
     row.roll_number || row.application_id || '',
     row.full_name,
@@ -172,12 +217,7 @@ function evaluationRow(item: SpreadsheetSyncItem, results: Map<string, ResultRow
     row.shift ?? '',
     row.branch,
     row.panel_name,
-    row.evaluation_count,
-    row.expected_evaluations,
-    row.is_provisional ? 'provisional' : row.evaluation_status,
-    individualScores.join(' | '),
-    row.average_score === null ? '' : row.average_score,
-    judgeCount,
+    ...evaluationValues(row, preferences.get(item.entity_id) ?? []),
   ];
 }
 
@@ -194,7 +234,86 @@ const EVAL_HEADER = [
   'individual_scores',
   'final_average',
   'judge_count',
+  'preferred_vertical_interview',
 ];
+
+interface PushPlan {
+  reference: SheetsConnectionConfig;
+  tab: string;
+  keyCol: number;
+  nameCol: number;
+  scoreCols: (number | null)[];
+  headers: unknown[];
+  values: unknown[][];
+  updates: { range: string; values: unknown[][] }[];
+  appends: unknown[][];
+  items: SpreadsheetSyncItem[];
+}
+
+function planFor(
+  plans: Map<string, PushPlan>,
+  resolved: { reference: SheetsConnectionConfig; tabTitle: string },
+  values: unknown[][],
+): PushPlan | null {
+  const key = `${resolved.reference.spreadsheetId}|${resolved.tabTitle}`;
+  const existing = plans.get(key);
+  if (existing) return existing;
+  const headers = (values[0] ?? []).map((h) => String(h ?? ''));
+  const keyCol = columnIndex(headers, APPLICANT_KEY_ALIASES);
+  const nameCol = columnIndex(headers, ['full_name', 'applicant_name', 'name']);
+  if (keyCol === null || nameCol === null) return null;
+  const plan: PushPlan = {
+    reference: resolved.reference,
+    tab: resolved.tabTitle,
+    keyCol,
+    nameCol,
+    scoreCols: EVAL_HEADER.map((h) => columnIndex(headers, [h])),
+    headers,
+    values,
+    updates: [],
+    appends: [],
+    items: [],
+  };
+  plans.set(key, plan);
+  return plan;
+}
+
+function contiguousUpdates(
+  plan: PushPlan,
+  rowNumber: number,
+  row: unknown[],
+): { range: string; values: unknown[][] }[] {
+  const cells: { col: number; value: unknown }[] = [];
+  for (let i = 0; i < EVAL_HEADER.length; i++) {
+    const col = plan.scoreCols[i];
+    if (col === null) continue;
+    cells.push({ col, value: row[i] });
+  }
+  cells.sort((a, b) => a.col - b.col);
+  const updates: { range: string; values: unknown[][] }[] = [];
+  const tab = plan.tab.replace(/'/g, "''");
+  for (let start = 0; start < cells.length; ) {
+    let end = start;
+    while (end + 1 < cells.length && cells[end + 1].col === cells[end].col + 1) end++;
+    updates.push({
+      range: `'${tab}'!${colLetter(cells[start].col)}${rowNumber}`,
+      values: [cells.slice(start, end + 1).map((c) => c.value)],
+    });
+    start = end + 1;
+  }
+  return updates;
+}
+
+function appendedRow(plan: PushPlan, row: unknown[]): unknown[] {
+  const values = new Array(plan.headers.length).fill('');
+  for (let i = 0; i < EVAL_HEADER.length; i++) {
+    const col = plan.scoreCols[i];
+    if (col !== null) values[col] = row[i];
+  }
+  values[plan.keyCol] = row[0];
+  values[plan.nameCol] = row[1];
+  return values;
+}
 
 export async function pushToSheets(store: Store, config: AppConfig, actorId: string): Promise<SyncRunSummary> {
   const summary: SyncRunSummary = { pulled: [], pushed: [], skipped: [], connection_ok: false };
@@ -213,106 +332,103 @@ export async function pushToSheets(store: Store, config: AppConfig, actorId: str
   const effective = { credentialsJson: cfg.credentialsJson, spreadsheetId };
   summary.connection_ok = true;
 
-  // Drain queue with retries.
-  const claimed = await store.claimSpreadsheetSync(25);
+  // Drain the durable queue. Concurrent drains are safe: claim is atomic and
+  // each queued entity has exactly one row (latest submission wins).
+  const claimed = await store.claimSpreadsheetSync(50);
   if (claimed.length === 0) return summary;
 
   const resultsList = await store.results({ admin: true }, { includeArchived: true });
   const results = new Map(resultsList.map((r) => [r.candidate_id, r]));
   const verticals = await store.listVerticals();
   const byId = new Map(verticals.map((v) => [v.id, v]));
+  const verticalNames = new Map(verticals.map((v) => [v.id, v.name]));
+  const preferences = preferredVerticalLabels(await store.listEvaluations({ admin: true }), verticalNames);
+
+  const plans = new Map<string, PushPlan>();
+  const resolvedCache = new Map<string, { reference: SheetsConnectionConfig; tabTitle: string }>();
+  const logError = async (item: SpreadsheetSyncItem, msg: string, terminal: boolean) => {
+    const attempts = item.attempts + 1;
+    const status = terminal || attempts >= 5 ? 'failed' : 'pending';
+    await store.completeSpreadsheetSync(item.id, status, { error: msg, attempts });
+    summary.pushed.push({ id: item.id, status, detail: msg });
+    await store.logSpreadsheetSync({
+      connection_id: connection?.id ?? null,
+      direction: 'to_sheet',
+      operation: 'push',
+      row_key: item.row_key,
+      status: 'error',
+      detail: msg,
+      actor_id: actorId,
+    });
+  };
 
   for (const item of claimed) {
+    if (item.entity_type !== 'evaluation') {
+      await store.completeSpreadsheetSync(item.id, 'done', {});
+      summary.pushed.push({ id: item.id, status: 'done' });
+      continue;
+    }
+    const row = evaluationRow(item, results, preferences);
+    if (!row) {
+      await logError(item, 'candidate no longer exists', true);
+      continue;
+    }
+    const worksheet =
+      item.worksheet || byId.get(results.get(item.entity_id)?.vertical_id ?? '')?.worksheet || '';
+    if (!worksheet) {
+      await logError(item, 'no worksheet mapped for vertical', true);
+      continue;
+    }
     try {
-      if (item.entity_type === 'evaluation') {
-        const row = evaluationRow(item, results);
-        if (!row) {
-          await store.completeSpreadsheetSync(item.id, 'failed', { error: 'candidate no longer exists' });
-          summary.pushed.push({ id: item.id, status: 'failed', detail: 'candidate no longer exists' });
+      let resolved = resolvedCache.get(worksheet);
+      if (!resolved) {
+        resolved = await resolveWorksheet(effective, worksheet);
+        resolvedCache.set(worksheet, resolved);
+      }
+      const planKey = `${resolved.reference.spreadsheetId}|${resolved.tabTitle}`;
+      let plan = plans.get(planKey);
+      if (!plan) {
+        const { values } = await readTab(resolved.reference, resolved.tabTitle);
+        plan = planFor(plans, resolved, values) ?? undefined;
+        if (!plan) {
+          await logError(item, `worksheet "${resolved.tabTitle}" header row missing key/name columns`, true);
           continue;
         }
-        const worksheet =
-          item.worksheet || byId.get(results.get(item.entity_id)?.vertical_id ?? '')?.worksheet || '';
-        if (!worksheet) {
-          await store.completeSpreadsheetSync(item.id, 'failed', { error: 'no worksheet mapped for vertical' });
-          summary.pushed.push({ id: item.id, status: 'failed', detail: 'no worksheet mapped' });
-          continue;
-        }
-        const resolved = await resolveWorksheet(effective, worksheet);
-        const tab = resolved.tabTitle;
-        const { values } = await readTab(resolved.reference, tab);
-        const headers = (values[0] ?? []).map((h) => String(h ?? ''));
-        const keyCol = columnIndex(headers, APPLICANT_KEY_ALIASES);
-        const nameCol = columnIndex(headers, ['full_name', 'applicant_name', 'name']);
-        const scoreCols = EVAL_HEADER.map((h) => columnIndex(headers, [h]));
-        if (keyCol === null || nameCol === null) {
-          await store.completeSpreadsheetSync(item.id, 'failed', { error: `worksheet "${tab}" header row missing key/name columns` });
-          summary.pushed.push({ id: item.id, status: 'failed', detail: 'header missing' });
-          continue;
-        }
-        const matchRow = findRowByKey(values, keyCol, item.row_key) ?? findRowByKey(values, nameCol, item.row_key);
-        const rowIdx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-        const updates: { range: string; values: unknown[][] }[] = [];
-        if (matchRow) {
-          for (const ci of rowIdx) {
-            const col = scoreCols[ci];
-            if (col === null) continue;
-            updates.push({
-              range: `'${tab.replace(/'/g, "''")}'!${colLetter(col)}${matchRow}`,
-              values: [[row[ci]]],
-            });
-          }
-        } else {
-          // Append: header + values for this applicant.
-          const full = [EVAL_HEADER.map((_, i) => row[i])];
-          await appendRow(resolved.reference, tab, full[0]);
-        }
-        if (updates.length) await writeBatch(resolved.reference, updates);
+      }
+      const matchRow =
+        findRowByKey(plan.values, plan.keyCol, item.row_key) ??
+        findRowByKey(plan.values, plan.nameCol, item.row_key);
+      if (matchRow) {
+        plan.updates.push(...contiguousUpdates(plan, matchRow, row));
+      } else {
+        plan.appends.push(appendedRow(plan, row));
+      }
+      plan.items.push(item);
+    } catch (e) {
+      await logError(item, String((e as Error).message ?? e), false);
+    }
+  }
+
+  for (const plan of plans.values()) {
+    try {
+      if (plan.updates.length) await writeBatch(plan.reference, plan.updates);
+      if (plan.appends.length) await appendRows(plan.reference, plan.tab, plan.appends);
+      for (const item of plan.items) {
         await store.completeSpreadsheetSync(item.id, 'done', {});
         summary.pushed.push({ id: item.id, status: 'done' });
         await store.logSpreadsheetSync({
           connection_id: connection?.id ?? null,
           direction: 'to_sheet',
-          operation: matchRow ? 'update' : 'append',
+          operation: 'update',
           row_key: item.row_key,
           status: 'ok',
-          detail: `tab=${tab}`,
+          detail: `tab=${plan.tab}`,
           actor_id: actorId,
         });
-      } else {
-        // applicant entity: minimal push = mark imported_at / sync state.
-        await store.completeSpreadsheetSync(item.id, 'done', {});
-        summary.pushed.push({ id: item.id, status: 'done' });
       }
     } catch (e) {
       const msg = String((e as Error).message ?? e);
-      const item2 = item;
-      const failed = item2.attempts >= 3;
-      await store.completeSpreadsheetSync(item2.id, failed ? 'failed' : 'conflict', {
-        error: msg,
-        conflict: failed ? undefined : { retry_after: 'next sync run' },
-      });
-      if (!failed) {
-        // requeue for retry
-        await store.enqueueSpreadsheetSync({
-          direction: item2.direction,
-          entity_type: item2.entity_type,
-          entity_id: item2.entity_id,
-          worksheet: item2.worksheet,
-          row_key: item2.row_key,
-          payload: item2.payload,
-        });
-      }
-      summary.pushed.push({ id: item2.id, status: failed ? 'failed' : 'conflict', detail: msg });
-      await store.logSpreadsheetSync({
-        connection_id: connection?.id ?? null,
-        direction: item2.direction,
-        operation: 'push',
-        row_key: item2.row_key,
-        status: 'error',
-        detail: msg,
-        actor_id: actorId,
-      });
+      for (const item of plan.items) await logError(item, msg, false);
     }
   }
   return summary;
@@ -373,24 +489,17 @@ export async function exportApplicantsToSheets(
   const effective: SheetsConnectionConfig = { credentialsJson: cfg.credentialsJson, spreadsheetId };
   summary.connection_ok = true;
 
-  const [verticals, panels, candidates, evaluations] = await Promise.all([
+  const [verticals, panels, candidates, evaluations, resultsList] = await Promise.all([
     store.listVerticals(),
     store.listPanels(),
     store.listCandidates({ admin: true }, { includeArchived: false }),
     store.listEvaluations({ admin: true }),
+    store.results({ admin: true }, { includeArchived: true }),
   ]);
   const panelNames = new Map(panels.map((p) => [p.id, p.name]));
   const verticalNames = new Map(verticals.map((v) => [v.id, v.name]));
-  const preferences = new Map<string, string[]>();
-  for (const e of [...evaluations].sort((a, b) => a.submitted_at.localeCompare(b.submitted_at))) {
-    if (!e.preferred_vertical_id) continue;
-    const name = verticalNames.get(e.preferred_vertical_id);
-    if (!name) continue;
-    const label = e.judge_name ? `${name} (${e.judge_name})` : name;
-    const list = preferences.get(e.candidate_id) ?? [];
-    list.push(label);
-    preferences.set(e.candidate_id, list);
-  }
+  const preferences = preferredVerticalLabels(evaluations, verticalNames);
+  const resultByCandidate = new Map(resultsList.map((r) => [r.candidate_id, r]));
   const groups = new Map<string, Candidate[]>();
   const unassigned: Candidate[] = [];
   for (const c of candidates) {
@@ -416,13 +525,7 @@ export async function exportApplicantsToSheets(
     c.github_url ?? '',
     c.team_message ?? '',
     c.remarks ?? '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    (preferences.get(c.id) ?? []).join(', '),
+    ...evaluationValues(resultByCandidate.get(c.id), preferences.get(c.id) ?? []),
   ];
 
   const writeTab = async (

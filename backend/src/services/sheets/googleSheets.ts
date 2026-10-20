@@ -160,7 +160,25 @@ export async function appendRow(
   });
 }
 
-/** Tab titles cannot contain these characters and are capped at 100 chars. */
+  /** Append several rows in one request (used by queued evaluation pushes). */
+  export async function appendRows(
+    cfg: SheetsConnectionConfig,
+    tabTitle: string,
+    rows: unknown[][],
+  ): Promise<void> {
+    if (rows.length === 0) return;
+    const sheets = makeClient(cfg.credentialsJson);
+    const range = `'${tabTitle.replace(/'/g, "''")}'`;
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: cfg.spreadsheetId,
+      range,
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: rows },
+    });
+  }
+
+  /** Tab titles cannot contain these characters and are capped at 100 chars. */
 export function sanitizeTabTitle(value: string): string {
   const cleaned = String(value ?? '')
     .replace(/[[\]:*?/\\]/g, ' ')

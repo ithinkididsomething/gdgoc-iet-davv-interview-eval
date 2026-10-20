@@ -441,6 +441,39 @@ describe('spreadsheet sync queue', () => {
     expect((await store.listSpreadsheetSync('done'))).toHaveLength(1);
   });
 
+  it('re-arms a finished row and keeps retry attempts bounded', async () => {
+    const { store } = makeApp();
+    const item = {
+      direction: 'to_sheet' as const,
+      entity_type: 'evaluation' as const,
+      entity_id: randomUUID(),
+      worksheet: 'Content',
+      row_key: '21BCS1002',
+      payload: { v: 1 },
+    };
+    await store.enqueueSpreadsheetSync(item);
+    const first = await store.claimSpreadsheetSync(10);
+    await store.completeSpreadsheetSync(first[0].id, 'done', {});
+    expect(await store.listSpreadsheetSync('pending')).toHaveLength(0);
+
+    // A later evaluation for the same candidate must be pushed, not dropped
+    // because the previous queue row is done.
+    await store.enqueueSpreadsheetSync({ ...item, payload: { v: 2 } });
+    const again = await store.listSpreadsheetSync('pending');
+    expect(again).toHaveLength(1);
+    expect(again[0].payload).toEqual({ v: 2 });
+
+    const claimed = await store.claimSpreadsheetSync(10);
+    await store.completeSpreadsheetSync(claimed[0].id, 'pending', {
+      error: 'temporary',
+      attempts: 2,
+    });
+    const retry = await store.listSpreadsheetSync('pending');
+    expect(retry).toHaveLength(1);
+    expect(retry[0].attempts).toBe(2);
+    expect(retry[0].last_error).toBe('temporary');
+  });
+
   it('evaluation submission enqueues a push when the vertical has a worksheet', async () => {
     const { app, store } = makeApp();
     const adminId = await seedAdmin(store);

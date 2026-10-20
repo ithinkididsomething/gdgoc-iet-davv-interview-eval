@@ -390,9 +390,10 @@ export interface Store {
     payload: Record<string, unknown>;
   }): Promise<void>;
   claimSpreadsheetSync(limit: number): Promise<SpreadsheetSyncItem[]>;
-  completeSpreadsheetSync(id: string, status: 'done' | 'failed' | 'conflict', detail: {
+  completeSpreadsheetSync(id: string, status: 'done' | 'failed' | 'conflict' | 'pending', detail: {
     error?: string;
     conflict?: Record<string, unknown>;
+    attempts?: number;
   }): Promise<void>;
   listSpreadsheetSync(status?: string): Promise<SpreadsheetSyncItem[]>;
   getSpreadsheetConnection(): Promise<SpreadsheetConnection | null>;

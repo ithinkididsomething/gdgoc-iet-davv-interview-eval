@@ -3,6 +3,7 @@ import { useAuth } from './auth';
 import { useOnline } from './net';
 import { getLastSyncAt, SyncEngine, type SyncReport } from './sync';
 import { listOutbox } from './idb';
+import { scheduleSheetSync } from './sheetSync';
 
 interface SyncCtx {
   engine: SyncEngine;
@@ -44,8 +45,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const syncNow = useCallback(async () => {
     const report = await engine.syncNow();
     await refresh();
+    if (report.synced > 0) scheduleSheetSync(getToken);
     return report;
-  }, [engine, refresh]);
+  }, [engine, refresh, getToken]);
 
   useEffect(() => {
     const unsub = engine.subscribe(() => {

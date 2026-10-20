@@ -125,6 +125,24 @@ export function sheetSyncRoutes(store: Store, config: AppConfig): Router {
     }
   });
 
+  // Any signed-in judge may nudge the queue (debounced client-side). It only
+  // drains work that was already enqueued by submissions, so this cannot leak
+  // sheet data; responses are deliberately reduced to counters.
+  r.post('/sheets/trigger', requireAuth, async (req: AuthedRequest, res, next) => {
+    try {
+      const summary = await pushToSheets(store, config, req.user!.id);
+      const pending = (await store.listSpreadsheetSync('pending')).length;
+      res.json({
+        connection_ok: summary.connection_ok,
+        pushed: summary.pushed.filter((p) => p.status === 'done').length,
+        failed: summary.pushed.filter((p) => p.status === 'failed').length,
+        pending,
+      });
+    } catch (e) {
+      next(e);
+    }
+  });
+
   // Write the header row + every active applicant into one tab per vertical.
   r.post('/sheets/export', requireAuth, async (req: AuthedRequest, res, next) => {
     try {

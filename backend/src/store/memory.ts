@@ -945,12 +945,10 @@ export class MemoryStore implements Store {
       if (claimed.length >= limit) break;
       if (q.status === 'pending') {
         q.status = 'in_flight';
-        q.attempts += 1;
         q.updated_at = this.now();
         claimed.push({ ...q });
       } else if (q.status === 'in_flight' && new Date(q.updated_at).getTime() + 60_000 < now) {
         // stale lease
-        q.attempts += 1;
         q.updated_at = this.now();
         claimed.push({ ...q });
       }
@@ -959,12 +957,13 @@ export class MemoryStore implements Store {
   }
   async completeSpreadsheetSync(
     id: string,
-    status: 'done' | 'failed' | 'conflict',
-    detail: { error?: string; conflict?: Record<string, unknown> },
+    status: 'done' | 'failed' | 'conflict' | 'pending',
+    detail: { error?: string; conflict?: Record<string, unknown>; attempts?: number },
   ): Promise<void> {
     const q = this.syncQueue.get(id);
     if (!q) return;
     q.status = status;
+    if (detail.attempts !== undefined) q.attempts = detail.attempts;
     q.last_error = detail.error ?? '';
     q.conflict = detail.conflict ?? null;
     q.updated_at = this.now();
