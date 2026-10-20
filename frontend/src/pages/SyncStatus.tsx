@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { AnimatedNumber, ConfirmDialog } from '../components/Ui';
+import { PageHeader } from '../components/PageHeader';
+import { AnimatedNumber, ConfirmDialog, ProgressBar } from '../components/Ui';
 import { useAuth } from '../lib/auth';
 import { listOutbox } from '../lib/idb';
 import { useOnline } from '../lib/net';
@@ -30,9 +31,20 @@ export function SyncStatus() {
   const conflicts = items.filter((i) => i.status === 'conflict');
   const synced = items.filter((i) => i.status === 'synced');
 
+  const total = items.length;
+  const syncedPct = total > 0 ? Math.round((synced.length / total) * 100) : running ? 40 : 100;
+
   return (
     <>
-      <h1>Synchronization</h1>
+      <PageHeader
+        title="Synchronization"
+        description="Upload queued evaluations, review conflicts, and confirm the last successful sync on this device."
+        actions={
+          <button className="btn" onClick={() => void syncNow()} disabled={running || !online || status !== 'online'}>
+            {running ? 'Synchronizing…' : 'Sync now'}
+          </button>
+        }
+      />
       <div className="card">
         <div className="grid cols-3">
           <div className="stat yellow">
@@ -56,13 +68,28 @@ export function SyncStatus() {
         </div>
         <p className="muted mt">
           {online ? 'Network is available.' : 'Network is offline — items stay queued.'}{' '}
-          {lastSyncAt ? `Last sync: ${new Date(lastSyncAt).toLocaleString()}` : 'No successful sync yet.'}
+          {lastSyncAt ? `Last successful sync: ${new Date(lastSyncAt).toLocaleString()}` : 'No successful sync yet.'}
           {status === 'offline' ? ' You are on an offline session — sign in to sync.' : ''}
         </p>
+        <div className="sync-progress-wrap">
+          <div className="btn-row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+            <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>
+              {running ? 'Uploading queued evaluations…' : errors.length ? 'Retry waiting on failed items' : 'Sync progress'}
+            </span>
+            <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>
+              {syncedPct}%
+            </span>
+          </div>
+          <ProgressBar
+            value={syncedPct}
+            tone={errors.length || conflicts.length ? 'yellow' : 'green'}
+            label="Synchronization progress"
+          />
+        </div>
         {lastReport && <div className={`alert ${lastReport.errors || lastReport.conflicts ? 'warn' : 'success'}`}>{lastReport.message}</div>}
         <div className="btn-row">
           <button className="btn" onClick={() => void syncNow()} disabled={running || !online || status !== 'online'}>
-            {running ? 'Synchronizing…' : 'Synchronize now'}
+            {running ? 'Synchronizing…' : 'Sync now'}
           </button>
           {synced.length > 0 && (
             <button className="btn secondary" onClick={() => setConfirmClear(true)}>

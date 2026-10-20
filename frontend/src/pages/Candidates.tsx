@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { listCachedCandidates, saveCandidates } from '../lib/idb';
 import { useOnline } from '../lib/net';
+import { PageHeader } from '../components/PageHeader';
 import { SortableTh, useSort } from '../components/Sortable';
 import type { Candidate, Vertical } from '../lib/types';
 
@@ -17,10 +18,11 @@ const STATUS_TONE: Record<string, string> = {
 export function Candidates() {
   const { getToken, panels } = useAuth();
   const online = useOnline();
+  const [params] = useSearchParams();
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [source, setSource] = useState<'server' | 'cache'>('server');
   const [verticals, setVerticals] = useState<Vertical[]>([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(params.get('q') ?? '');
   const [branch, setBranch] = useState('');
   const [panelId, setPanelId] = useState('');
   const [verticalId, setVerticalId] = useState('');
@@ -77,6 +79,11 @@ export function Candidates() {
   }, [online, verticals.length, getToken]);
 
   useEffect(() => {
+    const q = params.get('q');
+    if (q != null) setSearch(q);
+  }, [params]);
+
+  useEffect(() => {
     const t = setTimeout(() => void load(), 250);
     return () => clearTimeout(t);
   }, [load]);
@@ -111,15 +118,20 @@ export function Candidates() {
   );
   const sort = useSort(candidates ?? [], getSortValue, 'name');
 
+  const verticalName = (id: string | null | undefined) =>
+    id ? verticals.find((v) => v.id === id)?.name ?? id : null;
+
   return (
     <>
-      <h1>Candidates</h1>
-      <p className="muted">
-        {source === 'cache'
-          ? 'Showing locally cached data (offline).'
-          : 'Loaded from the server.'}{' '}
-        {candidates ? `${candidates.length} shown.` : ''}
-      </p>
+      <PageHeader
+        title="Candidates"
+        description={
+          <>
+            {source === 'cache' ? 'Showing locally cached data (offline).' : 'Loaded from the server.'}{' '}
+            {candidates ? `${candidates.length} shown.` : ''}
+          </>
+        }
+      />
       {error && source === 'cache' && (
         <div className="alert warn">Could not reach the server ({error}). Using cached data.</div>
       )}
@@ -188,53 +200,95 @@ export function Candidates() {
       ) : candidates.length === 0 ? (
         <div className="empty">No candidates match your filters.</div>
       ) : (
-        <div className="table-wrap card" style={{ padding: 0 }}>
-          <table className="data">
-            <thead>
-              <tr>
-                <SortableTh label="Name" sortKey="name" state={sort} />
-                <SortableTh label="Branch" sortKey="branch" state={sort} />
-                <SortableTh label="Roll" sortKey="roll" state={sort} />
-                <SortableTh label="Vertical / Shift" sortKey="vertical" state={sort} />
-                <SortableTh label="Priority" sortKey="priority" state={sort} />
-                <SortableTh label="Application" sortKey="application" state={sort} />
-                <SortableTh label="Status" sortKey="status" state={sort} />
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {sort.sorted.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.full_name}</td>
-                  <td>{c.branch}</td>
-                  <td className="mono">{c.roll_number ?? '—'}</td>
-                  <td>
-                    {c.vertical_id ? (
-                      <>
-                        {verticals.find((v) => v.id === c.vertical_id)?.name ?? c.vertical_id}
-                        {c.shift ? <div className="muted" style={{ fontSize: '0.75rem' }}>{c.shift}</div> : null}
-                      </>
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                  </td>
-                  <td>{c.priority ?? '—'}</td>
-                  <td className="mono">{c.application_id ?? '—'}</td>
-                  <td>
-                    <span className={`badge ${STATUS_TONE[c.interview_status] ?? 'neutral'}`}>
-                      {c.interview_status.replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td>
-                    <Link className="btn small" to={`/candidates/${c.id}/evaluate`}>
-                      Evaluate
-                    </Link>
-                  </td>
+        <>
+          <div className="table-wrap card desktop-table" style={{ padding: 0 }}>
+            <table className="data">
+              <thead>
+                <tr>
+                  <SortableTh label="Name" sortKey="name" state={sort} />
+                  <SortableTh label="Branch" sortKey="branch" state={sort} />
+                  <SortableTh label="Roll" sortKey="roll" state={sort} />
+                  <SortableTh label="Vertical / Shift" sortKey="vertical" state={sort} />
+                  <SortableTh label="Priority" sortKey="priority" state={sort} />
+                  <SortableTh label="Application" sortKey="application" state={sort} />
+                  <SortableTh label="Status" sortKey="status" state={sort} />
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {sort.sorted.map((c) => (
+                  <tr key={c.id}>
+                    <td>{c.full_name}</td>
+                    <td>{c.branch}</td>
+                    <td className="mono">{c.roll_number ?? '—'}</td>
+                    <td>
+                      {c.vertical_id ? (
+                        <>
+                          {verticalName(c.vertical_id)}
+                          {c.shift ? <div className="muted" style={{ fontSize: '0.75rem' }}>{c.shift}</div> : null}
+                        </>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td>{c.priority ?? '—'}</td>
+                    <td className="mono">{c.application_id ?? '—'}</td>
+                    <td>
+                      <span className={`badge ${STATUS_TONE[c.interview_status] ?? 'neutral'}`}>
+                        {c.interview_status.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td>
+                      <Link className="btn small" to={`/candidates/${c.id}/evaluate`}>
+                        Evaluate
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="stack-list">
+            {sort.sorted.map((c) => (
+              <article className="stack-card" key={c.id}>
+                <div className="stack-card-head">
+                  <strong>{c.full_name}</strong>
+                  <span className={`badge ${STATUS_TONE[c.interview_status] ?? 'neutral'}`}>
+                    {c.interview_status.replace('_', ' ')}
+                  </span>
+                </div>
+                <dl>
+                  <div>
+                    <dt>Branch</dt>
+                    <dd>{c.branch || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Roll</dt>
+                    <dd className="mono">{c.roll_number ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Vertical / shift</dt>
+                    <dd>
+                      {verticalName(c.vertical_id) ?? '—'}
+                      {c.shift ? ` · ${c.shift}` : ''}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Priority</dt>
+                    <dd>{c.priority ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Application</dt>
+                    <dd className="mono">{c.application_id ?? '—'}</dd>
+                  </div>
+                </dl>
+                <Link className="btn" to={`/candidates/${c.id}/evaluate`}>
+                  Evaluate
+                </Link>
+              </article>
+            ))}
+          </div>
+        </>
       )}
     </>
   );

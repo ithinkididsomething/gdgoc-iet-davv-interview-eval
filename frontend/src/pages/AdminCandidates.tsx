@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api, downloadCsv, ApiError, API_URL } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { PageHeader } from '../components/PageHeader';
 import { ConfirmDialog } from '../components/Ui';
 import { AdminCandidateProfile } from '../components/AdminCandidateProfile';
 import { SortableTh, useSort } from '../components/Sortable';
@@ -17,9 +19,10 @@ interface ImportSheetAudit {
 
 export function AdminCandidates() {
   const { getToken } = useAuth();
+  const [params] = useSearchParams();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [panels, setPanels] = useState<Panel[]>([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(params.get('q') ?? '');
   const [branch, setBranch] = useState('');
   const [panelId, setPanelId] = useState('');
   const [includeArchived, setIncludeArchived] = useState(false);
@@ -54,6 +57,11 @@ export function AdminCandidates() {
     const p = await api<{ panels: Panel[] }>('/panels', { token });
     setPanels(p.panels);
   }, [getToken, search, branch, panelId, includeArchived]);
+
+  useEffect(() => {
+    const q = params.get('q');
+    if (q != null) setSearch(q);
+  }, [params]);
 
   useEffect(() => {
     const t = setTimeout(() => void load().catch((e) => setError(String(e.message ?? e))), 250);
@@ -183,7 +191,19 @@ export function AdminCandidates() {
 
   return (
     <>
-      <h1>Candidates</h1>
+      <PageHeader
+        title="Candidates"
+        description="Search, import, and maintain applicant records for interview panels."
+        actions={
+          <button
+            className="btn"
+            onClick={() => setEditing({ panel_id: panels[0]?.id ?? '', branch: '' })}
+            disabled={panels.length === 0}
+          >
+            Add candidate
+          </button>
+        }
+      />
       {error && <div className="alert error">{error}</div>}
       {notice && <div className="alert success">{notice}</div>}
 

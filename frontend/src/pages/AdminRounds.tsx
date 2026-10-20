@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { PageHeader } from '../components/PageHeader';
 import { SortableTh, useSort } from '../components/Sortable';
 import type { Criterion, Round } from '../lib/types';
 
@@ -181,12 +182,10 @@ export function AdminRounds() {
 
   return (
     <>
-      <h1>Rounds &amp; criteria</h1>
-      <p className="muted">
-        Configure the evaluation rubric before interviews. If a round has active criteria, the overall
-        score is the weighted mean of criterion scores. If it has none, judges enter a single overall
-        score (1–10). Edits after submission are only possible when explicitly enabled per round.
-      </p>
+      <PageHeader
+        title="Rounds & criteria"
+        description="Configure the evaluation rubric. Active criteria produce a weighted score; otherwise judges enter a single overall score. Edits after submission are enabled per round."
+      />
       {error && <div className="alert error">{error}</div>}
       {notice && <div className="alert success">{notice}</div>}
 

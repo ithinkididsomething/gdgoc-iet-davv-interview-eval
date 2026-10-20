@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, downloadCsv } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { PageHeader } from '../components/PageHeader';
 import { ProgressBar, Stat } from '../components/Ui';
 import type { SheetConnectionStatus, Vertical } from '../lib/types';
 
@@ -154,7 +155,10 @@ export function AdminReports() {
 
   return (
     <>
-      <h1>Reports &amp; exports</h1>
+      <PageHeader
+        title="Reports & exports"
+        description="Track evaluation coverage, export reports, and synchronize the connected spreadsheet."
+      />
       {error && <div className="alert error">{error}</div>}
       {notice && <div className="alert success">{notice}</div>}
 

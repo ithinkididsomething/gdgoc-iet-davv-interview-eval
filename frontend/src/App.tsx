@@ -16,6 +16,7 @@ import { MyEvaluations } from './pages/MyEvaluations';
 import { OfflinePrep } from './pages/OfflinePrep';
 import { PanelVerify } from './pages/PanelVerify';
 import { Register } from './pages/Register';
+import { Settings } from './pages/Settings';
 import { SyncStatus } from './pages/SyncStatus';
 
 export default function App() {
@@ -48,6 +49,7 @@ export default function App() {
         <Route path="/my-evaluations" element={<MyEvaluations />} />
         <Route path="/offline" element={<OfflinePrep />} />
         <Route path="/sync" element={<SyncStatus />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/admin" element={<Dashboard />} />
         <Route path="/admin/candidates" element={<AdminCandidates />} />
         <Route path="/admin/panels" element={<AdminPanels />} />

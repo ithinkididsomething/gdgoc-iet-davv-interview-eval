@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { PageHeader } from '../components/PageHeader';
 import { SortableTh, useSort } from '../components/Sortable';
 import type { Vertical } from '../lib/types';
 
@@ -106,11 +107,10 @@ export function AdminVerticals() {
 
   return (
     <>
-      <h1>Verticals</h1>
-      <p className="muted">
-        The recruitment verticals drive candidate grouping, sidebar filters and the worksheet
-        mapping for spreadsheet sync.
-      </p>
+      <PageHeader
+        title="Verticals"
+        description="Recruitment verticals drive candidate grouping, filters, and worksheet mapping for spreadsheet sync."
+      />
       {error && <div className="alert error">{error}</div>}
       {notice && <div className="alert success">{notice}</div>}
 

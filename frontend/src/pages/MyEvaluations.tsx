@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth';
 import { listOutbox } from '../lib/idb';
 import { useOnline } from '../lib/net';
 import { useSync } from '../lib/syncContext';
+import { PageHeader } from '../components/PageHeader';
 import { SortableTh, useSort } from '../components/Sortable';
 import type { EvaluationWithScores, OutboxItem, Vertical } from '../lib/types';
 
@@ -77,85 +78,115 @@ export function MyEvaluations() {
 
   return (
     <>
-      <h1>My evaluations</h1>
-      <h2>On this device</h2>
-      {local.length === 0 ? (
-        <div className="card empty">No locally stored evaluations.</div>
-      ) : (
-        local
-          .slice()
-          .reverse()
-          .map((item) => (
-            <div className="card tight outbox-item" key={item.id}>
-              <div className="head">
-                <strong>{item.candidate_name || item.candidate_id}</strong>
-                <span>{statusBadge(item.status)}</span>
+      <PageHeader
+        title="My evaluations"
+        description="Local drafts on this device and evaluations already submitted to the server."
+        actions={
+          <Link className="btn secondary" to="/sync">
+            Sync status
+          </Link>
+        }
+      />
+      <section className="section">
+        <h2>On this device</h2>
+        {local.length === 0 ? (
+          <div className="card empty">No locally stored evaluations.</div>
+        ) : (
+          local
+            .slice()
+            .reverse()
+            .map((item) => (
+              <div className="card tight outbox-item" key={item.id}>
+                <div className="head">
+                  <strong>{item.candidate_name || item.candidate_id}</strong>
+                  <span>{statusBadge(item.status)}</span>
+                </div>
+                <div className="muted">
+                  {item.round_name} · score {item.overall_score ?? '—'} ·{' '}
+                  {new Date(item.client_created_at).toLocaleString()}
+                  {item.attempts > 0 ? ` · ${item.attempts} attempt(s)` : ''}
+                </div>
+                {item.last_error && <div className="muted">Last error: {item.last_error}</div>}
+                <div className="btn-row mt">
+                  <Link className="btn secondary small" to={`/candidates/${item.candidate_id}/evaluate`}>
+                    Open
+                  </Link>
+                  <Link className="btn secondary small" to="/sync">
+                    Sync status
+                  </Link>
+                </div>
               </div>
-              <div className="muted">
-                {item.round_name} · score {item.overall_score ?? '—'} ·{' '}
-                {new Date(item.client_created_at).toLocaleString()}
-                {item.attempts > 0 ? ` · ${item.attempts} attempt(s)` : ''}
-              </div>
-              {item.last_error && <div className="muted">Last error: {item.last_error}</div>}
-              <div className="btn-row mt">
-                <Link className="btn secondary small" to={`/candidates/${item.candidate_id}/evaluate`}>
-                  Open
-                </Link>
-                <Link className="btn secondary small" to="/sync">
-                  Sync status
-                </Link>
-              </div>
-            </div>
-          ))
-      )}
+            ))
+        )}
+      </section>
 
-      <h2>Submitted (server)</h2>
-      {!online ? (
-        <div className="alert warn">Offline — server history is unavailable.</div>
-      ) : server === null ? (
-        <div className="empty">
-          <span className="spinner" /> Loading…
-        </div>
-      ) : server.length === 0 ? (
-        <div className="card empty">No submitted evaluations yet.</div>
-      ) : (
-        <div className="table-wrap card" style={{ padding: 0 }}>
-          <table className="data">
-            <thead>
-              <tr>
-                <SortableTh label="Candidate" sortKey="candidate" state={sort} />
-                <SortableTh label="Round" sortKey="round" state={sort} />
-                <th>Preferred vertical</th>
-                <SortableTh label="Score" sortKey="score" state={sort} />
-                <SortableTh label="Version" sortKey="version" state={sort} />
-                <SortableTh label="Submitted" sortKey="submitted" state={sort} />
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
+      <section className="section">
+        <h2>Submitted (server)</h2>
+        {!online ? (
+          <div className="alert warn">Offline — server history is unavailable.</div>
+        ) : server === null ? (
+          <div className="empty">
+            <span className="spinner" /> Loading…
+          </div>
+        ) : server.length === 0 ? (
+          <div className="card empty">No submitted evaluations yet.</div>
+        ) : (
+          <>
+            <div className="table-wrap card desktop-table" style={{ padding: 0 }}>
+              <table className="data">
+                <thead>
+                  <tr>
+                    <SortableTh label="Candidate" sortKey="candidate" state={sort} />
+                    <SortableTh label="Round" sortKey="round" state={sort} />
+                    <SortableTh label="Score" sortKey="score" state={sort} />
+                    <SortableTh label="Version" sortKey="version" state={sort} />
+                    <SortableTh label="Submitted" sortKey="submitted" state={sort} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {sort.sorted.map((e) => (
+                    <tr key={e.id}>
+                      <td>{e.candidate_name ?? e.candidate_id}</td>
+                      <td>{e.round_name ?? e.round_id}</td>
+                      <td>{e.overall_score ?? '—'}</td>
+                      <td>v{e.version}</td>
+                      <td>{new Date(e.submitted_at).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="stack-list">
               {sort.sorted.map((e) => (
-                <tr key={e.id}>
-                  <td>{e.candidate_name ?? e.candidate_id}</td>
-                  <td>{e.round_name ?? e.round_id}</td>
-                  <td>
-                    {e.preferred_vertical_id
-                      ? verticals.find((v) => v.id === e.preferred_vertical_id)?.name ?? e.preferred_vertical_id
-                      : '—'}
-                  </td>
-                  <td>{e.overall_score ?? '—'}</td>
-                  <td>v{e.version}</td>
-                  <td>{new Date(e.submitted_at).toLocaleString()}</td>
-                  <td>
-                    <Link className="btn secondary small" to={`/candidates/${e.candidate_id}/evaluate`}>
-                      Edit
-                    </Link>
-                  </td>
-                </tr>
+                <article className="stack-card" key={e.id}>
+                  <div className="stack-card-head">
+                    <strong>{e.candidate_name ?? e.candidate_id}</strong>
+                    <span className="badge ok">Submitted</span>
+                  </div>
+                  <dl>
+                    <div>
+                      <dt>Round</dt>
+                      <dd>{e.round_name ?? e.round_id}</dd>
+                    </div>
+                    <div>
+                      <dt>Score</dt>
+                      <dd>{e.overall_score ?? '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Version</dt>
+                      <dd>v{e.version}</dd>
+                    </div>
+                    <div>
+                      <dt>Submitted</dt>
+                      <dd>{new Date(e.submitted_at).toLocaleString()}</dd>
+                    </div>
+                  </dl>
+                </article>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </div>
+          </>
+        )}
+      </section>
     </>
   );
 }

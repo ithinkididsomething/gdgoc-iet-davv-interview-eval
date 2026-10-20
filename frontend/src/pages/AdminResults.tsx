@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { api, downloadCsv } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { PageHeader } from '../components/PageHeader';
 import { SortableTh, useSort } from '../components/Sortable';
 import { AdminCandidateProfile } from '../components/AdminCandidateProfile';
 import type { Panel, ResultRow, Vertical } from '../lib/types';
@@ -91,7 +92,20 @@ export function AdminResults() {
 
   return (
     <>
-      <h1>Results</h1>
+      <PageHeader
+        title="Results"
+        description="Filter scored candidates, inspect individual ratings, and export CSV files."
+        actions={
+          <>
+            <button className="btn" onClick={() => void exportCsv('summary')}>
+              Export summary CSV
+            </button>
+            <button className="btn secondary" onClick={() => void exportCsv('detailed')}>
+              Export detailed CSV
+            </button>
+          </>
+        }
+      />
       {error && <div className="alert error">{error}</div>}
       <div className="card">
         <div className="filters">

@@ -18,9 +18,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const supabaseUrl = env.SUPABASE_URL ?? '';
   const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY ?? '';
   const codePepper = env.CODE_PEPPER ?? '';
+  const demoMode = env.DEMO_MODE === '1' || env.DEMO_MODE === 'true';
   if (!supabaseUrl || !serviceRoleKey || !codePepper) {
     // Only enforced when the Supabase store is actually constructed.
-    if (env.NODE_ENV !== 'test') {
+    if (env.NODE_ENV !== 'test' && !demoMode) {
       throw new Error(
         'Missing required env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CODE_PEPPER',
       );

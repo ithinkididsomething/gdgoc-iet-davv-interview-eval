@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { PageHeader } from '../components/PageHeader';
 import { ConfirmDialog } from '../components/Ui';
 import { SortableTh, useSort } from '../components/Sortable';
 
@@ -88,12 +89,10 @@ export function AdminJudges() {
 
   return (
     <>
-      <h1>Judges &amp; accounts</h1>
-      <p className="muted">
-        Judge accounts are created through the registration page. Promote an account to administrator
-        here — never share the admin credentials. Deactivating a judge blocks their API access
-        immediately (their stored evaluations are kept).
-      </p>
+      <PageHeader
+        title="Judges & accounts"
+        description="Judge accounts are created through registration. Promote administrators here and deactivate access without deleting stored evaluations."
+      />
       {error && <div className="alert error">{error}</div>}
       {notice && <div className="alert success">{notice}</div>}
       <div className="table-wrap card" style={{ padding: 0 }}>

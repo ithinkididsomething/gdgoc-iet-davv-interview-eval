@@ -1,7 +1,13 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from './api';
-import { OFFLINE_SESSION_HOURS, SUPABASE_ANON_KEY, SUPABASE_URL } from './config';
+import {
+  DEMO_MODE,
+  OFFLINE_SESSION_HOURS,
+  SUPABASE_ANON_KEY,
+  SUPABASE_CONFIGURED,
+  SUPABASE_URL,
+} from './config';
 import {
   getOfflineSession,
   saveOfflineSession,
@@ -33,6 +39,7 @@ interface AuthState {
 }
 
 const PENDING_CODE_KEY = 'gdgoc-pending-code';
+const DEMO_TOKEN_KEY = 'gdgoc-demo-token';
 
 /**
  * Completes registration server-side: a valid panel code makes the account a
@@ -52,11 +59,32 @@ const AuthContext = createContext<AuthState | null>(null);
 let sb: SupabaseClient | null = null;
 export function supabase(): SupabaseClient {
   if (!sb) {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      throw new Error('Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+    }
     sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { persistSession: true, autoRefreshToken: true, storageKey: 'gdgoc-auth' },
     });
   }
   return sb;
+}
+
+async function restoreOfflineSession(
+  setOfflineSession: (value: OfflineSession | null) => void,
+  setProfile: (value: Profile | null) => void,
+  setStatus: (value: AuthState['status']) => void,
+): Promise<boolean> {
+  const off = await getOfflineSession();
+  if (!off) return false;
+  setOfflineSession(off);
+  setProfile({
+    id: off.user_id,
+    email: off.email,
+    full_name: off.full_name,
+    role: off.role,
+  });
+  setStatus('offline');
+  return true;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -80,50 +108,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const applyDemoSession = useCallback(
+    async (token: string) => {
+      localStorage.setItem(DEMO_TOKEN_KEY, token);
+      await loadMe(token);
+      setOfflineSession(await getOfflineSession());
+      setStatus('online');
+    },
+    [loadMe],
+  );
+
   const bootstrap = useCallback(async () => {
-    const sbClient = supabase();
-    const { data } = await sbClient.auth.getSession();
-    const s = data.session;
-    setSession(s);
-    if (s) {
-      try {
-        await loadMe(s.access_token);
-        setStatus('online');
-        setOfflineSession(await getOfflineSession());
-        return;
-      } catch {
-        // Token valid but backend unreachable — fall back to offline session.
-        const off = await getOfflineSession();
-        if (off) {
-          setOfflineSession(off);
-          setProfile({
-            id: off.user_id,
-            email: off.email,
-            full_name: off.full_name,
-            role: off.role,
-          });
-          setStatus('offline');
+    if (DEMO_MODE) {
+      const token = localStorage.getItem(DEMO_TOKEN_KEY);
+      if (token) {
+        try {
+          await applyDemoSession(token);
           return;
+        } catch {
+          localStorage.removeItem(DEMO_TOKEN_KEY);
         }
       }
-    }
-    const off = await getOfflineSession();
-    if (off) {
-      setOfflineSession(off);
-      setProfile({
-        id: off.user_id,
-        email: off.email,
-        full_name: off.full_name,
-        role: off.role,
-      });
-      setStatus('offline');
+      if (await restoreOfflineSession(setOfflineSession, setProfile, setStatus)) return;
+      setStatus('signed_out');
       return;
     }
-    setStatus('signed_out');
-  }, [loadMe]);
+
+    // Missing VITE_SUPABASE_* (typical Vercel preview) must not call createClient —
+    // that throws and leaves a blank page.
+    if (!SUPABASE_CONFIGURED) {
+      if (await restoreOfflineSession(setOfflineSession, setProfile, setStatus)) return;
+      setStatus('signed_out');
+      return;
+    }
+
+    try {
+      const sbClient = supabase();
+      const { data } = await sbClient.auth.getSession();
+      const s = data.session;
+      setSession(s);
+      if (s) {
+        try {
+          await loadMe(s.access_token);
+          setStatus('online');
+          setOfflineSession(await getOfflineSession());
+          return;
+        } catch {
+          // Token valid but backend unreachable — fall back to offline session.
+          if (await restoreOfflineSession(setOfflineSession, setProfile, setStatus)) return;
+        }
+      }
+      if (await restoreOfflineSession(setOfflineSession, setProfile, setStatus)) return;
+      setStatus('signed_out');
+    } catch {
+      if (await restoreOfflineSession(setOfflineSession, setProfile, setStatus)) return;
+      setStatus('signed_out');
+    }
+  }, [applyDemoSession, loadMe]);
 
   useEffect(() => {
     void bootstrap();
+    if (DEMO_MODE || !SUPABASE_CONFIGURED) return;
     const { data: sub } = supabase().auth.onAuthStateChange((_event, s) => {
       setSession(s);
     });
@@ -132,6 +177,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = useCallback(
     async (email: string, password: string) => {
+      if (DEMO_MODE) {
+        const res = await api<{ token: string }>('/auth/demo-login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password }),
+        });
+        await applyDemoSession(res.token);
+        return;
+      }
       const { error } = await supabase().auth.signInWithPassword({ email, password });
       if (error) throw new Error(error.message);
       const { data } = await supabase().auth.getSession();
@@ -161,11 +214,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setOfflineSession(await getOfflineSession());
       setStatus('online');
     },
-    [loadMe],
+    [applyDemoSession, loadMe],
   );
 
   const register = useCallback(
     async (fullName: string, email: string, password: string, code: string) => {
+      if (DEMO_MODE) {
+        throw new Error('Registration is disabled in demo mode. Sign in with admin@demo.local or judge@demo.local.');
+      }
       const { data, error } = await supabase().auth.signUp({
         email,
         password,
@@ -193,10 +249,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
-    try {
-      await supabase().auth.signOut({ scope: 'local' });
-    } catch {
-      /* offline — local wipe still proceeds */
+    localStorage.removeItem(DEMO_TOKEN_KEY);
+    if (!DEMO_MODE) {
+      try {
+        await supabase().auth.signOut({ scope: 'local' });
+      } catch {
+        /* offline — local wipe still proceeds */
+      }
     }
     await wipeLocalData();
     setSession(null);
@@ -207,6 +266,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getToken = useCallback(async () => {
+    if (DEMO_MODE) return localStorage.getItem(DEMO_TOKEN_KEY);
+    if (!SUPABASE_CONFIGURED) return null;
     const { data } = await supabase().auth.getSession();
     return data.session?.access_token ?? null;
   }, []);

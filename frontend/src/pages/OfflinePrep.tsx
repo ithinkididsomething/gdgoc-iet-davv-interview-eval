@@ -15,6 +15,7 @@ import {
 import { useOnline } from '../lib/net';
 import { useSync } from '../lib/syncContext';
 import { getLastSyncAt } from '../lib/sync';
+import { PageHeader } from '../components/PageHeader';
 import type { Candidate, Criterion, Round } from '../lib/types';
 
 export function OfflinePrep() {
@@ -85,12 +86,50 @@ export function OfflinePrep() {
 
   return (
     <>
-      <h1>Offline preparation</h1>
-      <p className="muted">
-        Judges can interview and rate candidates without internet after this one-time preparation.
-        Evaluations are stored in this browser (IndexedDB) and uploaded automatically when you are
-        back online.
-      </p>
+      <PageHeader
+        title="Offline preparation"
+        description="Prepare this device for interviews without internet. Evaluations stay in the browser and upload when you are back online."
+        actions={
+          <button className="btn" onClick={() => void prepare()} disabled={busy || !online}>
+            {busy ? 'Preparing…' : 'Prepare device'}
+          </button>
+        }
+      />
+
+      <div className="card">
+        <h3>Connection status</h3>
+        <p>
+          <span className={`badge ${online ? 'ok' : 'warn'}`}>{online ? 'Online' : 'Offline'}</span>{' '}
+          {ready ? (
+            <span className="badge ok">Ready for offline interviews</span>
+          ) : (
+            <span className="badge warn">Not ready</span>
+          )}
+        </p>
+        <p className="muted" style={{ marginBottom: 0 }}>
+          Last successful sync:{' '}
+          {lastSyncAt ? new Date(lastSyncAt).toLocaleString() : 'never on this device'}
+        </p>
+      </div>
+
+      <div className="card">
+        <h3>Queued actions</h3>
+        <p>
+          {pending > 0 ? (
+            <span className="badge warn">{pending} evaluation{pending === 1 ? '' : 's'} waiting to upload</span>
+          ) : (
+            <span className="badge ok">No queued evaluations</span>
+          )}
+        </p>
+        <div className="btn-row">
+          <button className="btn secondary" onClick={() => void syncNow()} disabled={busy || !online}>
+            Retry sync
+          </button>
+          <Link className="btn secondary" to="/sync">
+            Open sync details
+          </Link>
+        </div>
+      </div>
 
       <div className="card">
         <h3>Readiness</h3>

@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { PageHeader } from '../components/PageHeader';
 import { ConfirmDialog } from '../components/Ui';
 import { SortableTh, useSort } from '../components/Sortable';
 import type { Panel, PanelMember } from '../lib/types';
@@ -187,7 +188,10 @@ export function AdminPanels() {
 
   return (
     <>
-      <h1>Panels &amp; verification codes</h1>
+      <PageHeader
+        title="Panels & verification codes"
+        description="Create interview panels, issue verification codes, and assign judges."
+      />
       {error && <div className="alert error">{error}</div>}
       {notice && <div className="alert success">{notice}</div>}
 

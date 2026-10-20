@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../lib/auth';
 import { AuthShell } from '../components/Ui';
+import { useAuth } from '../lib/auth';
+import { DEMO_MODE } from '../lib/config';
 
 export function Login() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(DEMO_MODE ? 'admin@demo.local' : '');
+  const [password, setPassword] = useState(DEMO_MODE ? 'demo1234' : '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -27,6 +28,14 @@ export function Login() {
 
   return (
     <AuthShell title="Sign in" subtitle="GDGOC IET DAVV interview evaluation">
+      {DEMO_MODE && (
+        <div className="alert info">
+          Demo mode — admin: <span className="mono">admin@demo.local</span> /{' '}
+          <span className="mono">demo1234</span>
+          <br />
+          Judge: <span className="mono">judge@demo.local</span> / <span className="mono">demo1234</span>
+        </div>
+      )}
       {error && <div className="alert error">{error}</div>}
       <form onSubmit={submit}>
         <label className="field">

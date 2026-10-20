@@ -19,12 +19,14 @@ import { applicantImportRoutes } from './routes/admin-applicants.js';
 import { sheetSyncRoutes } from './routes/sheets.js';
 import { reportRoutes } from './routes/reports.js';
 import { registrationRoutes } from './routes/registration.js';
+import { DEMO_ACCOUNTS } from './demo/seed.js';
 import type { Store } from './store/types.js';
 
 export interface AppDeps {
   store: Store;
   verifyToken: TokenVerifier;
   config: AppConfig;
+  demoMode?: boolean;
 }
 
 export function createApp(deps: AppDeps): express.Express {
@@ -55,8 +57,33 @@ export function createApp(deps: AppDeps): express.Express {
   const auth = makeAuthMiddleware(deps.store, deps.verifyToken);
 
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, time: new Date().toISOString() });
+    res.json({ ok: true, demo: Boolean(deps.demoMode), time: new Date().toISOString() });
   });
+
+  if (deps.demoMode) {
+    app.post('/api/auth/demo-login', async (req, res, next) => {
+      try {
+        const email = String(req.body?.email ?? '').trim().toLowerCase();
+        const password = String(req.body?.password ?? '');
+        const account = DEMO_ACCOUNTS.find((a) => a.email === email && a.password === password);
+        if (!account) {
+          res.status(401).json({ error: { code: 'invalid_credentials', message: 'Invalid demo email or password' } });
+          return;
+        }
+        const profile = await deps.store.getProfile(account.id);
+        const panels = profile ? await deps.store.listMyPanels(profile.id) : [];
+        res.json({
+          token: `demo:${account.id}`,
+          profile: profile
+            ? { id: profile.id, email: profile.email, full_name: profile.full_name, role: profile.role }
+            : null,
+          panels,
+        });
+      } catch (e) {
+        next(e);
+      }
+    });
+  }
 
   // Authenticate once for the whole /api tree. Mounting `auth` in front of
   // every router made Express re-run it on each fall-through, so requests

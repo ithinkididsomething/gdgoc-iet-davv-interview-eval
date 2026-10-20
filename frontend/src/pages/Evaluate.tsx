@@ -350,19 +350,25 @@ export function Evaluate() {
 
   return (
     <>
-      <div className="btn-row mb">
-        <Link className="btn secondary small" to="/candidates">
-          ← Back
-        </Link>
-      </div>
-      <h1>{candidate.full_name}</h1>
-      <p className="muted">
-        {candidate.branch}
-        {candidate.roll_number ? ` · ${candidate.roll_number}` : ''}
-        {candidate.application_id ? ` · ${candidate.application_id}` : ''} ·{' '}
-        <span className="badge neutral">{candidate.interview_status.replace('_', ' ')}</span>
-        {candidate.priority ? <span className="badge blue">Priority {candidate.priority}</span> : null}
-      </p>
+      <header className="page-header">
+        <div className="page-header-copy">
+          <h1>{candidate.full_name}</h1>
+          <p className="page-desc">
+            {candidate.branch}
+            {candidate.roll_number ? ` · ${candidate.roll_number}` : ''}
+            {candidate.application_id ? ` · ${candidate.application_id}` : ''}
+          </p>
+          <p className="btn-row" style={{ marginTop: 8 }}>
+            <span className="badge neutral">{candidate.interview_status.replace('_', ' ')}</span>
+            {candidate.priority ? <span className="badge blue">Priority {candidate.priority}</span> : null}
+          </p>
+        </div>
+        <div className="page-actions">
+          <Link className="btn secondary" to="/candidates">
+            Back to candidates
+          </Link>
+        </div>
+      </header>
 
       <CandidateProfile
         candidate={candidate}
