@@ -121,8 +121,8 @@ export function AdminCandidateProfile({
                         {m.judge_name}{' '}
                         <span className="muted">
                           {m.verified_at
-                            ? `verified ${new Date(m.verified_at).toLocaleDateString()}`
-                            : 'not verified'}
+                            ? `code verified · ${new Date(m.verified_at).toLocaleDateString()}`
+                            : 'added by admin'}
                         </span>
                       </li>
                     ))}
