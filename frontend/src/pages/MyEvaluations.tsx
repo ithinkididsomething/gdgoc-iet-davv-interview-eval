@@ -78,6 +78,15 @@ export function MyEvaluations() {
           if (token) {
             const res = await api<{ evaluations: EvaluationWithScores[] }>('/evaluations/mine', { token });
             setServer(res.evaluations);
+            if (res.evaluations.length < 200) {
+              const serverIds = new Set(res.evaluations.map((e) => e.id));
+              const stale = (await listOutbox()).filter((i) => i.status === 'synced' && !serverIds.has(i.id));
+              if (stale.length > 0) {
+                for (const item of stale) await deleteOutboxItem(item.id);
+                await refresh();
+                setLocal(await listOutbox());
+              }
+            }
           }
         } catch {
           setServer(null);
