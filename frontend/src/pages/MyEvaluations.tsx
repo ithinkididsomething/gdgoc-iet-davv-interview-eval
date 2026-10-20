@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { listOutbox } from '../lib/idb';
+import { deleteOutboxItem, listOutbox } from '../lib/idb';
 import { useOnline } from '../lib/net';
 import { useSync } from '../lib/syncContext';
 import { SortableTh, useSort } from '../components/Sortable';
+import { ConfirmDialog } from '../components/Ui';
 import type { EvaluationWithScores, OutboxItem, Vertical } from '../lib/types';
 
 const statusBadge = (s: OutboxItem['status']) => {
@@ -23,6 +24,12 @@ const statusBadge = (s: OutboxItem['status']) => {
   }
 };
 
+interface DeleteTarget {
+  id: string;
+  candidate: string;
+  status?: OutboxItem['status'];
+}
+
 export function MyEvaluations() {
   const { getToken } = useAuth();
   const online = useOnline();
@@ -30,6 +37,10 @@ export function MyEvaluations() {
   const [server, setServer] = useState<EvaluationWithScores[] | null>(null);
   const [local, setLocal] = useState<OutboxItem[]>([]);
   const [verticals, setVerticals] = useState<Vertical[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const getSortValue = useCallback((e: EvaluationWithScores, key: string): unknown => {
     switch (key) {
@@ -75,9 +86,41 @@ export function MyEvaluations() {
     })();
   }, [getToken, online, refresh]);
 
+  const removeEvaluation = async () => {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    setError(null);
+    setNotice(null);
+    try {
+      if (!online) throw new Error('Connect to the internet to remove the server copy.');
+      if (deleteTarget.status === 'syncing') {
+        throw new Error('Wait for the current sync to finish, then delete again.');
+      }
+      const token = await getToken();
+      if (!token) throw new Error('Session expired. Sign in again.');
+      try {
+        await api(`/evaluations/${deleteTarget.id}`, { method: 'DELETE', token });
+      } catch (e) {
+        if (!(e instanceof ApiError) || e.status !== 404) throw e;
+      }
+      await deleteOutboxItem(deleteTarget.id);
+      await refresh();
+      setLocal(await listOutbox());
+      setServer((prev) => (prev ? prev.filter((e) => e.id !== deleteTarget.id) : prev));
+      setNotice(`${deleteTarget.candidate}'s evaluation was removed from this device and the server.`);
+      setDeleteTarget(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete evaluation');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <>
       <h1>My evaluations</h1>
+      {error && <div className="alert error">{error}</div>}
+      {notice && <div className="alert success">{notice}</div>}
       <h2>On this device</h2>
       {local.length === 0 ? (
         <div className="card empty">No locally stored evaluations.</div>
@@ -104,6 +147,19 @@ export function MyEvaluations() {
                 <Link className="btn secondary small" to="/sync">
                   Sync status
                 </Link>
+                <button
+                  className="btn danger small"
+                  disabled={item.status === 'syncing' || deleting}
+                  onClick={() =>
+                    setDeleteTarget({
+                      id: item.id,
+                      candidate: item.candidate_name || item.candidate_id,
+                      status: item.status,
+                    })
+                  }
+                >
+                  Delete
+                </button>
               </div>
             </div>
           ))
@@ -148,7 +204,19 @@ export function MyEvaluations() {
                   <td>
                     <Link className="btn secondary small" to={`/candidates/${e.candidate_id}/evaluate`}>
                       Edit
-                    </Link>
+                    </Link>{' '}
+                    <button
+                      className="btn danger small"
+                      disabled={deleting}
+                      onClick={() =>
+                        setDeleteTarget({
+                          id: e.id,
+                          candidate: e.candidate_name ?? e.candidate_id,
+                        })
+                      }
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -156,6 +224,22 @@ export function MyEvaluations() {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete this evaluation?"
+        message={
+          deleteTarget
+            ? `${deleteTarget.candidate}'s evaluation will be removed from this device and the server. The candidate can then be evaluated again. This cannot be undone.`
+            : ''
+        }
+        confirmLabel={deleting ? 'Deleting...' : 'Delete permanently'}
+        danger
+        onConfirm={() => void removeEvaluation()}
+        onCancel={() => {
+          if (!deleting) setDeleteTarget(null);
+        }}
+      />
     </>
   );
 }

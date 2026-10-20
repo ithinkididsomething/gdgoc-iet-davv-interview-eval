@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { badRequest, conflict, HttpError, notFound } from '../lib/errors.js';
+import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
 import { requireAuth, scopeFor, type AuthedRequest } from '../lib/auth.js';
 import { evaluationPatchSchema, evaluationSubmitSchema } from '../lib/validate.js';
-import { handleSubmission } from '../services/submit.js';
+import { enqueueEvaluationSheetSync, handleSubmission } from '../services/submit.js';
 import type { Store } from '../store/types.js';
 
 export function evaluationRoutes(store: Store): Router {
@@ -108,6 +108,49 @@ export function evaluationRoutes(store: Store): Router {
         },
       });
       res.json(outcome);
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  // Delete a submitted evaluation. Judges may delete their own; admins any.
+  r.delete('/evaluations/:id', requireAuth, async (req: AuthedRequest, res, next) => {
+    try {
+      const existing = await store.getEvaluation(req.params.id);
+      if (!existing) throw notFound('Evaluation not found');
+      const scope = await scopeFor(store, req.user!);
+      if (!scope.admin && existing.judge_id !== req.user!.id) {
+        throw forbidden("You cannot delete another judge's evaluation");
+      }
+      const deleted = await store.deleteEvaluation(existing.id);
+      if (!deleted) throw notFound('Evaluation not found');
+      const candidate = await store.getCandidate(existing.candidate_id, { admin: true });
+      if (candidate) {
+        try {
+          await enqueueEvaluationSheetSync(
+            store,
+            candidate,
+            existing.id,
+            existing.round_id,
+            existing.judge_id,
+          );
+        } catch {
+          /* sheet updates are best-effort */
+        }
+      }
+      await store.audit({
+        actor_id: req.user!.id,
+        action: 'evaluation_deleted',
+        entity_type: 'evaluation',
+        entity_id: existing.id,
+        details: {
+          candidate_id: existing.candidate_id,
+          round_id: existing.round_id,
+          judge_id: existing.judge_id,
+          overall_score: existing.overall_score,
+        },
+      });
+      res.json({ deleted: true, evaluation: deleted });
     } catch (e) {
       next(e);
     }

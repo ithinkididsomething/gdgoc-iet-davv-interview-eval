@@ -425,6 +425,7 @@ export interface Store {
   deleteCriterion(id: string, force?: boolean): Promise<{ deleted: boolean; scores: number }>;
 
   getEvaluation(id: string): Promise<EvaluationWithScores | null>;
+  deleteEvaluation(id: string): Promise<EvaluationWithScores | null>;
   getOfficialEvaluation(judgeId: string, candidateId: string, roundId: string): Promise<EvaluationWithScores | null>;
   listEvaluations(filter: {
     admin: boolean;

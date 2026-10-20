@@ -647,6 +647,15 @@ export class SupabaseStore implements Store {
       judge_name: judge?.full_name,
     };
   }
+  async deleteEvaluation(id: string): Promise<EvaluationWithScores | null> {
+    const existing = await this.getEvaluation(id);
+    if (!existing) return null;
+    const scores = await this.sb.from('criterion_scores').delete().eq('evaluation_id', id);
+    if (scores.error) throw new Error(`deleteEvaluation(scores): ${scores.error.message}`);
+    const { error } = await this.sb.from('evaluations').delete().eq('id', id);
+    if (error) throw new Error(`deleteEvaluation: ${error.message}`);
+    return existing;
+  }
   async getOfficialEvaluation(
     judgeId: string,
     candidateId: string,

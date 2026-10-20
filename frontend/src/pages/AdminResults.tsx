@@ -3,7 +3,8 @@ import { api, downloadCsv } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { SortableTh, useSort } from '../components/Sortable';
 import { AdminCandidateProfile } from '../components/AdminCandidateProfile';
-import type { Panel, ResultRow, Vertical } from '../lib/types';
+import { ConfirmDialog } from '../components/Ui';
+import type { JudgeRating, Panel, ResultRow, Vertical } from '../lib/types';
 
 const SERVER_SORT_KEYS = ['name', 'branch', 'average', 'priority', 'roll', 'created'];
 
@@ -21,6 +22,8 @@ export function AdminResults() {
   const [interviewStatus, setInterviewStatus] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ rating: JudgeRating; candidate: ResultRow } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const getSortValue = useCallback((r: ResultRow, key: string): unknown => {
@@ -86,6 +89,23 @@ export function AdminResults() {
       await downloadCsv(`/export/${kind}.csv?${qs()}`, token, `results-${kind}.csv`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Export failed');
+    }
+  };
+
+  const removeEvaluation = async () => {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Session expired. Sign in again.');
+      await api(`/evaluations/${deleteTarget.rating.evaluation_id}`, { method: 'DELETE', token });
+      setDeleteTarget(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete evaluation');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -249,6 +269,7 @@ export function AdminResults() {
                               <th>Score</th>
                               <th>Version</th>
                               <th>Submitted</th>
+                              <th></th>
                             </tr>
                           </thead>
                           <tbody>
@@ -258,6 +279,15 @@ export function AdminResults() {
                                 <td>{jr.score ?? '—'}</td>
                                 <td>v{jr.version}</td>
                                 <td>{new Date(jr.submitted_at).toLocaleString()}</td>
+                                <td>
+                                  <button
+                                    className="btn danger small"
+                                    disabled={deleting}
+                                    onClick={() => setDeleteTarget({ rating: jr, candidate: r })}
+                                  >
+                                    Delete
+                                  </button>
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -274,6 +304,22 @@ export function AdminResults() {
       </div>
 
       {profileId && <AdminCandidateProfile candidateId={profileId} onClose={() => setProfileId(null)} />}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete this evaluation?"
+        message={
+          deleteTarget
+            ? `${deleteTarget.rating.judge_name || deleteTarget.rating.judge_id}'s evaluation for ${deleteTarget.candidate.full_name} will be removed from the server and the candidate's results will be recalculated. This cannot be undone.`
+            : ''
+        }
+        confirmLabel={deleting ? 'Deleting...' : 'Delete permanently'}
+        danger
+        onConfirm={() => void removeEvaluation()}
+        onCancel={() => {
+          if (!deleting) setDeleteTarget(null);
+        }}
+      />
     </>
   );
 }

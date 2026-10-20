@@ -516,6 +516,14 @@ export class MemoryStore implements Store {
     if (!e) return null;
     return this.withScores(e);
   }
+  async deleteEvaluation(id: string): Promise<EvaluationWithScores | null> {
+    const e = this.evaluations.get(id);
+    if (!e) return null;
+    const full = await this.withScores(e);
+    this.evaluations.delete(id);
+    this.criterionScores.delete(id);
+    return full;
+  }
   async getOfficialEvaluation(
     judgeId: string,
     candidateId: string,

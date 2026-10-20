@@ -1,10 +1,32 @@
 import { computeOverallFromCriteria, round2, ScoreError, validateOverallScore } from '../lib/scoring.js';
 import type {
+  Candidate,
   CriterionScore,
   Store,
   SubmitEvaluationInput,
   SubmitOutcome,
 } from '../store/types.js';
+
+export async function enqueueEvaluationSheetSync(
+  store: Store,
+  candidate: Candidate,
+  evaluationId: string,
+  roundId: string,
+  judgeId: string,
+): Promise<void> {
+  const verticalId = candidate.vertical_id ?? null;
+  if (!verticalId) return;
+  const vertical = await store.getVertical(verticalId);
+  if (!vertical?.worksheet) return;
+  await store.enqueueSpreadsheetSync({
+    direction: 'to_sheet',
+    entity_type: 'evaluation',
+    entity_id: candidate.id,
+    worksheet: vertical.worksheet,
+    row_key: candidate.roll_number || candidate.application_id || candidate.full_name,
+    payload: { evaluation_id: evaluationId, round_id: roundId, judge_id: judgeId },
+  });
+}
 
 /**
  * Shared evaluation-submission pipeline used by POST /evaluations and
@@ -74,20 +96,7 @@ export async function handleSubmission(
   // never block an offline submission — the queue drains with retries).
   if (outcome.status === 'ok') {
     try {
-      const verticalId = candidate.vertical_id ?? null;
-      if (verticalId) {
-        const vertical = await store.getVertical(verticalId);
-        if (vertical?.worksheet) {
-          await store.enqueueSpreadsheetSync({
-            direction: 'to_sheet',
-            entity_type: 'evaluation',
-            entity_id: candidate.id,
-            worksheet: vertical.worksheet,
-            row_key: candidate.roll_number || candidate.application_id || candidate.full_name,
-            payload: { evaluation_id: input.id, round_id: input.round_id, judge_id: judgeId },
-          });
-        }
-      }
+      await enqueueEvaluationSheetSync(store, candidate, input.id, input.round_id, judgeId);
     } catch {
       /* queueing is best-effort */
     }

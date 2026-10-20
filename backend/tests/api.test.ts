@@ -488,6 +488,37 @@ describe('evaluations, averages and duplicates', () => {
     expect(patch.status).toBe(403);
   });
 
+  it('lets a judge delete their own evaluation and submit again', async () => {
+    const created = await submit(s.judge1Id, { [s.criteriaIds[0]]: 8, [s.criteriaIds[1]]: 6 });
+    expect(created.status).toBe(201);
+    const evalId = created.body.evaluation.id;
+    const deleted = await request(app).delete(`/api/evaluations/${evalId}`).set(auth(s.judge1Id));
+    expect(deleted.status).toBe(200);
+    expect(deleted.body.deleted).toBe(true);
+    expect(await store.getEvaluation(evalId)).toBeNull();
+    expect(await store.getOfficialEvaluation(s.judge1Id, s.candidateId, s.roundId)).toBeNull();
+    expect(store.audits.some((a) => a.action === 'evaluation_deleted' && a.entity_id === evalId)).toBe(true);
+
+    const again = await submit(s.judge1Id, { [s.criteriaIds[0]]: 9, [s.criteriaIds[1]]: 9 });
+    expect(again.status).toBe(201);
+  });
+
+  it('does not let a judge delete another judge evaluation', async () => {
+    const created = await submit(s.judge1Id, { [s.criteriaIds[0]]: 8, [s.criteriaIds[1]]: 6 });
+    const evalId = created.body.evaluation.id;
+    const deleted = await request(app).delete(`/api/evaluations/${evalId}`).set(auth(s.judge2Id));
+    expect(deleted.status).toBe(403);
+    expect(await store.getEvaluation(evalId)).not.toBeNull();
+  });
+
+  it('lets an admin delete any evaluation', async () => {
+    const created = await submit(s.judge1Id, { [s.criteriaIds[0]]: 8, [s.criteriaIds[1]]: 6 });
+    const evalId = created.body.evaluation.id;
+    const deleted = await request(app).delete(`/api/evaluations/${evalId}`).set(auth(s.adminId));
+    expect(deleted.status).toBe(200);
+    expect(await store.getEvaluation(evalId)).toBeNull();
+  });
+
   it('rejects submissions from judges without panel membership', async () => {
     const outsider = await store.createProfile({
       id: randomUUID(),
