@@ -318,7 +318,7 @@ export interface Store {
 
   listPanels(): Promise<Panel[]>;
   getPanel(id: string): Promise<Panel | null>;
-  createPanel(input: { name: string; expected_evaluations: number }): Promise<Panel>;
+  createPanel(input: { name: string; expected_evaluations?: number }): Promise<Panel>;
   updatePanel(
     id: string,
     patch: { name?: string; is_active?: boolean; expected_evaluations?: number },

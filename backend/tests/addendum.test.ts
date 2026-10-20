@@ -605,14 +605,17 @@ describe('expanded candidate filters', () => {
 });
 
 describe('provisional vs complete results', () => {
-  it('flags provisional results until the expected panel count is reached', async () => {
+  it('derives the total from panel membership and flags provisional results', async () => {
     const { app, store } = makeApp();
     const adminId = await seedAdmin(store);
     const j1 = await store.createProfile({ id: randomUUID(), email: 'j1@test', full_name: 'J1', role: 'judge' });
     const j2 = await store.createProfile({ id: randomUUID(), email: 'j2@test', full_name: 'J2', role: 'judge' });
     const panel = await store.createPanel({ name: 'P', expected_evaluations: 2 });
+    expect(panel.expected_evaluations).toBe(0);
     await store.addPanelMember(panel.id, j1.id, adminId);
+    expect((await store.getPanel(panel.id))?.expected_evaluations).toBe(1);
     await store.addPanelMember(panel.id, j2.id, adminId);
+    expect((await store.getPanel(panel.id))?.expected_evaluations).toBe(2);
     const round = await request(app).post('/api/rounds').set(auth(adminId)).send({ name: 'R' });
     const criteria = await store.listCriteria(round.body.round.id);
     const candidate = await store.createCandidate({ full_name: 'C', branch: 'CSE', application_id: null, panel_id: panel.id }, adminId);
@@ -629,6 +632,7 @@ describe('provisional vs complete results', () => {
     let rows = (await request(app).get('/api/results').set(auth(adminId))).body.results;
     expect(rows[0].evaluation_status).toBe('in_progress');
     expect(rows[0].is_provisional).toBe(true);
+    expect(rows[0].expected_evaluations).toBe(2);
     expect(rows[0].average_score).toBe(3);
 
     await request(app)

@@ -107,9 +107,13 @@ export class SupabaseStore implements Store {
     if (error) throw new Error(`getPanel: ${error.message}`);
     return data as Panel | null;
   }
-  async createPanel(input: { name: string; expected_evaluations: number }): Promise<Panel> {
+  async createPanel(input: { name: string; expected_evaluations?: number }): Promise<Panel> {
     return unwrap(
-      await this.sb.from('panels').insert(input).select('*').single(),
+      await this.sb
+        .from('panels')
+        .insert({ name: input.name, expected_evaluations: 0 })
+        .select('*')
+        .single(),
       'createPanel',
     ) as Panel;
   }
@@ -117,9 +121,13 @@ export class SupabaseStore implements Store {
     id: string,
     patch: { name?: string; is_active?: boolean; expected_evaluations?: number },
   ): Promise<Panel | null> {
+    const update: { name?: string; is_active?: boolean } = {};
+    if (patch.name !== undefined) update.name = patch.name;
+    if (patch.is_active !== undefined) update.is_active = patch.is_active;
+    if (Object.keys(update).length === 0) return this.getPanel(id);
     const { data, error } = await this.sb
       .from('panels')
-      .update(patch)
+      .update(update)
       .eq('id', id)
       .select('*')
       .maybeSingle();
@@ -1093,7 +1101,7 @@ export class SupabaseStore implements Store {
       const created = unwrap(
         await this.sb
           .from('panels')
-          .insert({ name, is_active: true, expected_evaluations: 1, shift: shift || null })
+          .insert({ name, is_active: true, expected_evaluations: 0, shift: shift || null })
           .select('*')
           .single(),
         'resolvePanelForImport',
@@ -1105,7 +1113,7 @@ export class SupabaseStore implements Store {
     const created = unwrap(
       await this.sb
         .from('panels')
-        .insert({ name: 'Imported', is_active: true, expected_evaluations: 1 })
+        .insert({ name: 'Imported', is_active: true, expected_evaluations: 0 })
         .select('*')
         .single(),
       'resolvePanelForImport',

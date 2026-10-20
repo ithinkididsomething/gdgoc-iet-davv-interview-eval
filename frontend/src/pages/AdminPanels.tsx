@@ -24,7 +24,6 @@ export function AdminPanels() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
-  const [newExpected, setNewExpected] = useState(1);
   const [codesPanel, setCodesPanel] = useState<PanelRow | null>(null);
   const [codes, setCodes] = useState<PanelCode[]>([]);
   const [plaintext, setPlaintext] = useState<string | null>(null);
@@ -78,7 +77,7 @@ export function AdminPanels() {
       await api('/panels', {
         method: 'POST',
         token,
-        body: JSON.stringify({ name: newName.trim(), expected_evaluations: newExpected }),
+        body: JSON.stringify({ name: newName.trim() }),
       });
       setNewName('');
       setNotice('Panel created.');
@@ -198,19 +197,13 @@ export function AdminPanels() {
             <label>Panel name</label>
             <input value={newName} onChange={(e) => setNewName(e.target.value)} />
           </div>
-          <div>
-            <label>Expected evaluations per candidate</label>
-            <input
-              type="number"
-              min={1}
-              value={newExpected}
-              onChange={(e) => setNewExpected(Number(e.target.value))}
-            />
-          </div>
           <button className="btn" onClick={() => void createPanel()} disabled={!newName.trim()}>
             Create panel
           </button>
         </div>
+        <p className="muted" style={{ marginBottom: 0 }}>
+          Evaluations required per candidate automatically match the number of judges assigned to the panel.
+        </p>
       </div>
 
       {panels.map((panel) => (
@@ -223,8 +216,7 @@ export function AdminPanels() {
               </span>
             </div>
             <p className="muted">
-              Expected evaluations per candidate: {panel.expected_evaluations} ·{' '}
-              {panel.members.length} judge(s)
+              Total evaluations per candidate: {panel.members.length} (one per panel judge)
             </p>
             <ul>
               {panel.members.map((m) => (

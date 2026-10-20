@@ -110,7 +110,7 @@ export function AdminCandidateProfile({
               <div className="card">
                 <h4 style={{ marginTop: 0 }}>Panel</h4>
                 <p className="muted" style={{ marginTop: 0 }}>
-                  Expected evaluations: {data.panel?.expected_evaluations ?? '—'}
+                  Total evaluations per candidate: {data.panel_members.length} (one per judge)
                 </p>
                 {data.panel_members.length === 0 ? (
                   <span className="muted">No judges assigned.</span>

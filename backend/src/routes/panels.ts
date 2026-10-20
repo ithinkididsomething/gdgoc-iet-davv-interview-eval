@@ -89,7 +89,7 @@ export function panelRoutes(store: Store, config: AppConfig): Router {
     try {
       if (req.user!.role !== 'admin') throw new HttpError(403, 'forbidden', 'Administrator access required');
       const parsed = z
-        .object({ name: z.string().trim().min(1).max(120), expected_evaluations: z.number().int().min(1).max(50).default(1) })
+        .object({ name: z.string().trim().min(1).max(120) })
         .safeParse(req.body);
       if (!parsed.success) throw badRequest('Invalid request', parsed.error.flatten());
       const panel = await store.createPanel(parsed.data);
@@ -113,7 +113,6 @@ export function panelRoutes(store: Store, config: AppConfig): Router {
         .object({
           name: z.string().trim().min(1).max(120).optional(),
           is_active: z.boolean().optional(),
-          expected_evaluations: z.number().int().min(1).max(50).optional(),
         })
         .safeParse(req.body);
       if (!parsed.success) throw badRequest('Invalid request', parsed.error.flatten());

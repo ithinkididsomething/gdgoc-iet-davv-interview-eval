@@ -99,11 +99,17 @@ export class MemoryStore implements Store {
   async getPanel(id: string): Promise<Panel | null> {
     return this.panels.get(id) ?? null;
   }
-  async createPanel(input: { name: string; expected_evaluations: number }): Promise<Panel> {
+  async createPanel(input: { name: string; expected_evaluations?: number }): Promise<Panel> {
     if ([...this.panels.values()].some((p) => p.name === input.name)) {
       throw new Error('Panel name already exists');
     }
-    const p: Panel = { id: randomUUID(), created_at: this.now(), is_active: true, ...input };
+    const p: Panel = {
+      id: randomUUID(),
+      created_at: this.now(),
+      is_active: true,
+      name: input.name,
+      expected_evaluations: 0,
+    };
     this.panels.set(p.id, p);
     return p;
   }
@@ -113,7 +119,9 @@ export class MemoryStore implements Store {
   ): Promise<Panel | null> {
     const p = this.panels.get(id);
     if (!p) return null;
-    Object.assign(p, patch);
+    if (patch.name !== undefined) p.name = patch.name;
+    if (patch.is_active !== undefined) p.is_active = patch.is_active;
+    p.expected_evaluations = this.panelMembers.filter((m) => m.panel_id === id).length;
     return p;
   }
   async deletePanel(id: string): Promise<boolean> {
@@ -210,6 +218,10 @@ export class MemoryStore implements Store {
     if (!this.panelMembers.some((m) => m.panel_id === panelId && m.judge_id === judgeId)) {
       this.panelMembers.push({ panel_id: panelId, judge_id: judgeId, verified_at: null });
     }
+    const panel = this.panels.get(panelId);
+    if (panel) {
+      panel.expected_evaluations = this.panelMembers.filter((m) => m.panel_id === panelId).length;
+    }
     void assignedBy;
   }
   async removePanelMember(panelId: string, judgeId: string): Promise<boolean> {
@@ -217,6 +229,10 @@ export class MemoryStore implements Store {
     this.panelMembers = this.panelMembers.filter(
       (m) => !(m.panel_id === panelId && m.judge_id === judgeId),
     );
+    const panel = this.panels.get(panelId);
+    if (panel) {
+      panel.expected_evaluations = this.panelMembers.filter((m) => m.panel_id === panelId).length;
+    }
     return this.panelMembers.length < before;
   }
   async listPanelMembers(panelId: string): Promise<{ judge_id: string; judge_name: string; verified_at: string | null }[]> {
@@ -655,7 +671,7 @@ export class MemoryStore implements Store {
       const panel = this.panels.get(c.panel_id)!;
       const scores = submitted.map((e) => e.overall_score).filter((s): s is number => s !== null);
       const count = submitted.length;
-      const expected = panel?.expected_evaluations ?? 1;
+      const expected = this.panelMembers.filter((m) => m.panel_id === c.panel_id).length;
       const vertical = c.vertical_id ? this.verticals.get(c.vertical_id) : null;
       rows.push({
         candidate_id: c.id,
@@ -880,7 +896,7 @@ export class MemoryStore implements Store {
         id: randomUUID(),
         name,
         is_active: true,
-        expected_evaluations: 1,
+        expected_evaluations: 0,
         created_at: this.now(),
         shift: shift || '',
       };
@@ -894,7 +910,7 @@ export class MemoryStore implements Store {
       id: randomUUID(),
       name: fallbackName,
       is_active: true,
-      expected_evaluations: 1,
+      expected_evaluations: 0,
       created_at: this.now(),
     };
     this.panels.set(created.id, created);

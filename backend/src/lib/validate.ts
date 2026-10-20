@@ -97,13 +97,11 @@ export const evaluationPatchSchema = z.object({
 
 export const panelCreateSchema = z.object({
   name: z.string().trim().min(1).max(120),
-  expected_evaluations: z.number().int().min(1).max(50).default(1),
 });
 
 export const panelPatchSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   is_active: z.boolean().optional(),
-  expected_evaluations: z.number().int().min(1).max(50).optional(),
 });
 
 export const roundCreateSchema = z.object({
