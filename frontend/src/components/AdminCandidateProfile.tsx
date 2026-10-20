@@ -26,6 +26,10 @@ interface ProfileData {
   evaluations: ProfileEvaluation[];
 }
 
+function prettyLabel(value: string) {
+  return value.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function AdminCandidateProfile({
   candidateId,
   onClose,
@@ -62,13 +66,22 @@ export function AdminCandidateProfile({
       aria-label="Applicant profile"
       onClick={onClose}
     >
-      <div
-        className="dialog wide"
-        onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '1000px', maxHeight: '92vh', overflowY: 'auto' }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-          <h3 style={{ margin: 0 }}>{data?.candidate.full_name ?? 'Applicant profile'}</h3>
+      <div className="dialog wide" onClick={(e) => e.stopPropagation()}>
+        <div className="profile-modal-head">
+          <div>
+            <h3>{data?.candidate.full_name ?? 'Applicant profile'}</h3>
+            {data && (
+              <p className="muted">
+                {[
+                  data.candidate.roll_number || data.candidate.application_id,
+                  data.candidate.branch,
+                  data.panel?.name,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            )}
+          </div>
           <button className="btn secondary small" onClick={onClose}>
             Close
           </button>
@@ -82,8 +95,8 @@ export function AdminCandidateProfile({
         {data && (
           <>
             <div className="btn-row mt" style={{ flexWrap: 'wrap' }}>
-              <span className="badge neutral">Interview: {data.candidate.interview_status.replace('_', ' ')}</span>
-              <span className="badge blue">Shortlisting: {data.candidate.shortlisting_status}</span>
+              <span className="badge neutral">Interview: {prettyLabel(data.candidate.interview_status)}</span>
+              <span className="badge blue">Shortlisting: {prettyLabel(data.candidate.shortlisting_status)}</span>
               {data.candidate.archived_at && <span className="badge err">Archived</span>}
               <span className="badge neutral">{data.panel?.name ?? 'No panel'}</span>
               <span className="badge neutral">{data.vertical?.name ?? 'Unassigned vertical'}</span>
@@ -137,13 +150,13 @@ export function AdminCandidateProfile({
                     <div>
                       <span className="label">Status</span>
                       <span>
-                        {data.result.evaluation_status.replace('_', ' ')}
+                        {prettyLabel(data.result.evaluation_status)}
                         {data.result.is_provisional ? ' (provisional)' : ''}
                       </span>
                     </div>
                     <div>
-                      <span className="label">Completion</span>
-                      <span>{data.result.is_provisional ? 'provisional' : data.result.evaluation_status}</span>
+                      <span className="label">Provisional</span>
+                      <span>{data.result.is_provisional ? 'Yes' : 'No'}</span>
                     </div>
                   </div>
                 ) : (
@@ -158,7 +171,7 @@ export function AdminCandidateProfile({
             )}
             {data.evaluations.map((e) => (
               <div className="card mt" key={e.id}>
-                <div className="btn-row" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <div className="profile-eval-head">
                   <strong>{e.judge_name ?? e.judge_id}</strong>
                   <span className="muted">
                     {e.round_name ?? e.round_id} · v{e.version} · {new Date(e.submitted_at).toLocaleString()}
@@ -171,7 +184,7 @@ export function AdminCandidateProfile({
                   </div>
                   <div>
                     <span className="label">Status</span>
-                    <span>{e.status}</span>
+                    <span>{prettyLabel(e.status)}</span>
                   </div>
                   <div>
                     <span className="label">Preferred vertical</span>
@@ -180,8 +193,8 @@ export function AdminCandidateProfile({
                 </div>
                 {e.feedback?.trim() && (
                   <div className="mt">
-                    <span className="label">Written remark</span>
-                    <p style={{ marginTop: '0.2rem', whiteSpace: 'pre-wrap' }}>{e.feedback}</p>
+                    <span className="profile-note-label">Written remark</span>
+                    <div className="profile-note">{e.feedback}</div>
                   </div>
                 )}
                 <div className="table-wrap mt">

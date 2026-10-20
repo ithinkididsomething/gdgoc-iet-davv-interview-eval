@@ -837,32 +837,111 @@ table.data th .th-sort.active .th-sort-icon {
 }
 
 /* --------------------------------------------------- profile / outbox */
-.profile-card .profile-grid {
+.profile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 0.7rem 1.2rem;
+  gap: 0.8rem 1.2rem;
   margin: 0.7rem 0;
 }
-.profile-card .profile-grid .muted {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.profile-card .profile-grid div span.label {
+.profile-grid > div > span.label {
   display: block;
   font-weight: 600;
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-secondary);
-  margin-bottom: 0.1rem;
+  margin-bottom: 0.15rem;
+}
+.profile-grid > div > span:not(.label),
+.profile-grid > div > .value {
+  display: block;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+.profile-grid > div > p {
+  overflow-wrap: anywhere;
+  line-height: 1.5;
 }
 .profile-wide {
   grid-column: 1 / -1;
 }
+.profile-modal-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.profile-modal-head h3 {
+  margin: 0;
+}
+.profile-modal-head p {
+  margin: 0.25rem 0 0;
+}
+.profile-extra {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.55rem 1rem;
+  margin-top: 0.35rem;
+}
+.profile-extra .extra-key {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+.profile-extra .extra-value {
+  display: block;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+.profile-note {
+  margin-top: 0.55rem;
+  padding: 0.75rem 0.85rem;
+  border-left: 3px solid var(--g-blue-600);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.profile-note-label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin-bottom: 0.35rem;
+}
+.source-meta {
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.profile-eval-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.profile-eval-head .muted {
+  font-size: 0.8rem;
+}
 details.profile-card > summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.45rem;
   cursor: pointer;
   color: var(--text);
+}
+details.profile-card > summary .muted {
+  font-size: 0.8rem;
 }
 ul.link-list {
   margin: 0.2rem 0 0;
@@ -925,6 +1004,11 @@ details.row-details summary {
   width: 100%;
   box-shadow: var(--shadow-3);
   animation: popIn 220ms var(--ease) both;
+}
+.dialog.wide {
+  max-width: 1000px;
+  max-height: 92vh;
+  overflow-y: auto;
 }
 .dialog h3 {
   margin-top: 0;

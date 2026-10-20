@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Candidate, TaskLink } from '../../lib/types';
 
 function LinkList({ links, empty }: { links: TaskLink[]; empty: string }) {
@@ -16,9 +17,27 @@ function LinkList({ links, empty }: { links: TaskLink[]; empty: string }) {
   );
 }
 
+function Info({
+  label,
+  children,
+  wide = false,
+}: {
+  label: string;
+  children: ReactNode;
+  wide?: boolean;
+}) {
+  return (
+    <div className={wide ? 'profile-wide' : undefined}>
+      <span className="label">{label}</span>
+      <span className="value">{children}</span>
+    </div>
+  );
+}
+
 /**
- * Expanded applicant profile shown on the evaluation page: workbook-sourced
- * identity, vertical/shift/priority, links and task submissions.
+ * Expanded applicant profile shown on the evaluation page and in the admin
+ * profile dialog: workbook-sourced identity, vertical/shift/priority, links and
+ * submitted task.
  */
 export function CandidateProfile({
   candidate,
@@ -34,78 +53,57 @@ export function CandidateProfile({
     <details className="card profile-card" open>
       <summary>
         <strong>Applicant profile</strong>
-        <span className="muted" style={{ fontWeight: 400 }}>
-          {' '}
-          — vertical, shift, links and submitted task
-        </span>
+        <span className="muted"> Identity, links, and submitted work</span>
       </summary>
       <div className="profile-grid">
-        <div>
-          <span className="label">Vertical</span>
-          <span>
-            {verticalName || candidate.vertical_id ? (
-              verticalName ?? 'Assigned'
-            ) : (
-              <span className="muted">Unassigned</span>
-            )}
-          </span>
-        </div>
-        <div>
-          <span className="label">Shift</span>
-          <span>{candidate.shift || <span className="muted">—</span>}</span>
-        </div>
-        <div>
-          <span className="label">Priority</span>
-          <span>{candidate.priority ?? <span className="muted">—</span>}</span>
-        </div>
-        <div>
-          <span className="label">Email</span>
-          <span>{candidate.email || <span className="muted">—</span>}</span>
-        </div>
-        <div>
-          <span className="label">Roll number</span>
-          <span>{candidate.roll_number || candidate.application_id || <span className="muted">—</span>}</span>
-        </div>
-        <div>
-          <span className="label">Branch</span>
-          <span>{candidate.branch || '—'}</span>
-        </div>
-        <div className="profile-wide">
-          <span className="label">Submitted task</span>
+        <Info label="Vertical">
+          {verticalName || candidate.vertical_id ? (
+            verticalName ?? 'Assigned'
+          ) : (
+            <span className="muted">Unassigned</span>
+          )}
+        </Info>
+        <Info label="Shift">{candidate.shift || <span className="muted">—</span>}</Info>
+        <Info label="Priority">{candidate.priority ?? <span className="muted">—</span>}</Info>
+        <Info label="Email">{candidate.email || <span className="muted">—</span>}</Info>
+        <Info label="Roll number">
+          {candidate.roll_number || candidate.application_id || <span className="muted">—</span>}
+        </Info>
+        <Info label="Branch">{candidate.branch || <span className="muted">—</span>}</Info>
+        <Info label="Submitted task" wide>
           <LinkList links={candidate.task_links ?? []} empty="No task link recorded" />
-        </div>
-        <div className="profile-wide">
-          <span className="label">External profiles</span>
+        </Info>
+        <Info label="External profiles" wide>
           <LinkList links={candidate.external_profiles ?? []} empty="No profiles recorded" />
-        </div>
-        <div className="profile-wide">
-          <span className="label">Message to the team</span>
+        </Info>
+        <Info label="Message to the team" wide>
           <p style={{ margin: 0 }}>{candidate.team_message || <span className="muted">—</span>}</p>
-        </div>
-        <div className="profile-wide">
-          <span className="label">Remarks</span>
+        </Info>
+        <Info label="Remarks" wide>
           <p style={{ margin: 0 }}>{candidate.remarks || <span className="muted">—</span>}</p>
-        </div>
+        </Info>
         {extraEntries.length > 0 && (
           <div className="profile-wide">
             <span className="label">Workbook columns (other)</span>
-            <table className="data" style={{ marginTop: '0.25rem' }}>
-              <tbody>
-                {extraEntries.map(([k, v]) => (
-                  <tr key={k}>
-                    <td style={{ whiteSpace: 'nowrap' }}>{k}</td>
-                    <td>{String(v)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="profile-extra">
+              {extraEntries.map(([k, v]) => (
+                <div key={k}>
+                  <span className="extra-key">{k}</span>
+                  <span className="extra-value">{String(v)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
-        {(candidate.source_sheet || candidate.last_synced_at) && (
-          <div className="profile-wide muted" style={{ fontSize: '0.8rem' }}>
-            {candidate.source_sheet ? `Source: sheet “${candidate.source_sheet}”` : ''}
-            {candidate.source_row ? ` · row ${candidate.source_row}` : ''}
-            {candidate.last_synced_at ? ` · last synced ${new Date(candidate.last_synced_at).toLocaleString()}` : ''}
+        {(candidate.source_sheet || candidate.last_synced_at || candidate.source_row) && (
+          <div className="profile-wide muted source-meta">
+            {candidate.source_sheet ? `Source: ${candidate.source_sheet}` : ''}
+            {candidate.source_row ? `${candidate.source_sheet ? ' · ' : ''}Row ${candidate.source_row}` : ''}
+            {candidate.last_synced_at
+              ? `${candidate.source_sheet || candidate.source_row ? ' · ' : ''}Last synced ${new Date(
+                  candidate.last_synced_at,
+                ).toLocaleString()}`
+              : ''}
           </div>
         )}
       </div>
