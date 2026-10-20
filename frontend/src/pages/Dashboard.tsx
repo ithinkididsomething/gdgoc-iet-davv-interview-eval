@@ -1,22 +1,23 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { getLastSyncAt } from '../lib/sync';
+import { useOfflinePrep } from '../lib/offlinePrepContext';
 import { useSync } from '../lib/syncContext';
-import { useEffect, useState } from 'react';
-import { getMeta } from '../lib/idb';
 import { Stat } from '../components/Ui';
 
 export function Dashboard() {
   const { profile, panels, status, isOfflineSession } = useAuth();
-  const { pending, conflicts, errors, synced, lastReport, syncNow, running } = useSync();
-  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
-  const [prepared, setPrepared] = useState(false);
+  const {
+    pending,
+    conflicts,
+    errors,
+    synced,
+    lastReport,
+    lastSyncAt,
+    syncNow,
+    running,
+  } = useSync();
+  const { preparing, ready, error: prepError, report: prepReport } = useOfflinePrep();
   const isAdmin = profile?.role === 'admin';
-
-  useEffect(() => {
-    void getLastSyncAt().then(setLastSyncAt);
-    void getMeta<boolean>('offline_prepared').then((v) => setPrepared(!!v));
-  }, [pending, synced]);
 
   return (
     <>
@@ -80,21 +81,35 @@ export function Dashboard() {
           <div className="card">
             <h3>Offline readiness</h3>
             <p>
-              {prepared ? (
-                <span className="badge ok">Prepared for offline interviews</span>
+              {preparing ? (
+                <span className="badge blue">
+                  <span className="spinner" style={{ width: 10, height: 10, borderWidth: 2 }} />{' '}
+                  Preparing automatically
+                </span>
+              ) : ready ? (
+                <span className="badge ok">Offline data ready</span>
               ) : (
-                <span className="badge warn">Not prepared yet</span>
+                <span className="badge warn">
+                  {prepError ? 'Waiting to retry' : 'Preparing automatically'}
+                </span>
               )}
             </p>
             <p className="muted">
-              {lastSyncAt ? `Last successful sync: ${new Date(lastSyncAt).toLocaleString()}` : 'Never synchronized on this device.'}
+              Candidate lists and open rounds are saved automatically while you are online.
             </p>
+            <p className="muted">
+              {lastSyncAt
+                ? `Last successful sync: ${new Date(lastSyncAt).toLocaleString()}`
+                : 'Never synchronized on this device.'}
+            </p>
+            {prepError && <div className="alert warn">{prepError}</div>}
+            {prepReport && !preparing && <div className="alert success">{prepReport}</div>}
             <div className="btn-row">
               <Link className="btn secondary" to="/offline">
-                Prepare / re-check
+                View offline status
               </Link>
               <button className="btn secondary" onClick={() => void syncNow()} disabled={running || status !== 'online'}>
-                {running ? 'Syncing…' : 'Sync now'}
+                {running ? 'Syncing.' : 'Sync now'}
               </button>
             </div>
           </div>

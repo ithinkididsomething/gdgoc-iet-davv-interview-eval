@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { useAuth } from './lib/auth';
+import { OfflinePrepProvider } from './lib/offlinePrepContext';
 import { AdminCandidates } from './pages/AdminCandidates';
 import { AdminJudges } from './pages/AdminJudges';
 import { AdminPanels } from './pages/AdminPanels';
@@ -38,26 +39,28 @@ export default function App() {
   }
   return (
     <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/login" element={<Navigate to="/" replace />} />
-        <Route path="/register" element={<Navigate to="/" replace />} />
-        <Route path="/verify" element={<PanelVerify />} />
-        <Route path="/candidates" element={<Candidates />} />
-        <Route path="/candidates/:id/evaluate" element={<Evaluate />} />
-        <Route path="/my-evaluations" element={<MyEvaluations />} />
-        <Route path="/offline" element={<OfflinePrep />} />
-        <Route path="/sync" element={<SyncStatus />} />
-        <Route path="/admin" element={<Dashboard />} />
-        <Route path="/admin/candidates" element={<AdminCandidates />} />
-        <Route path="/admin/panels" element={<AdminPanels />} />
-        <Route path="/admin/judges" element={<AdminJudges />} />
-        <Route path="/admin/verticals" element={<AdminVerticals />} />
-        <Route path="/admin/rounds" element={<AdminRounds />} />
-        <Route path="/admin/results" element={<AdminResults />} />
-        <Route path="/admin/reports" element={<AdminReports />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <OfflinePrepProvider>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route path="/register" element={<Navigate to="/" replace />} />
+          <Route path="/verify" element={<PanelVerify />} />
+          <Route path="/candidates" element={<Candidates />} />
+          <Route path="/candidates/:id/evaluate" element={<Evaluate />} />
+          <Route path="/my-evaluations" element={<MyEvaluations />} />
+          <Route path="/offline" element={<OfflinePrep />} />
+          <Route path="/sync" element={<SyncStatus />} />
+          <Route path="/admin" element={<Dashboard />} />
+          <Route path="/admin/candidates" element={<AdminCandidates />} />
+          <Route path="/admin/panels" element={<AdminPanels />} />
+          <Route path="/admin/judges" element={<AdminJudges />} />
+          <Route path="/admin/verticals" element={<AdminVerticals />} />
+          <Route path="/admin/rounds" element={<AdminRounds />} />
+          <Route path="/admin/results" element={<AdminResults />} />
+          <Route path="/admin/reports" element={<AdminReports />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </OfflinePrepProvider>
     </Layout>
   );
 }
