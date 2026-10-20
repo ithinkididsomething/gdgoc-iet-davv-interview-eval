@@ -36,6 +36,55 @@ export function candidateRoutes(store: Store): Router {
     }
   });
 
+  // Full admin view of one applicant: profile, panel, result and every judge
+  // evaluation with criterion-level scores and written feedback.
+  r.get('/admin/candidates/:id/profile', requireAuth, async (req: AuthedRequest, res, next) => {
+    try {
+      isAdmin(req);
+      const candidate = await store.getCandidate(req.params.id, { admin: true });
+      if (!candidate) throw new HttpError(404, 'not_found', 'Candidate not found');
+      const [panel, panelMembers, verticals, evaluations] = await Promise.all([
+        store.getPanel(candidate.panel_id),
+        store.listPanelMembers(candidate.panel_id),
+        store.listVerticals(),
+        store.listEvaluations({ admin: true, candidateId: candidate.id }),
+      ]);
+      const vertical = verticals.find((v) => v.id === candidate.vertical_id) ?? null;
+      const verticalNames = new Map(verticals.map((v) => [v.id, v.name]));
+      const criteriaById = new Map<string, { name: string; max_score: number }>();
+      for (const roundId of [...new Set(evaluations.map((e) => e.round_id))]) {
+        for (const criterion of await store.listCriteria(roundId)) {
+          criteriaById.set(criterion.id, { name: criterion.name, max_score: criterion.max_score });
+        }
+      }
+      const resultRows = await store.results(
+        { admin: true },
+        { search: candidate.roll_number || candidate.full_name, includeArchived: true },
+      );
+      const result = resultRows.find((r) => r.candidate_id === candidate.id) ?? null;
+      res.json({
+        candidate,
+        panel,
+        panel_members: panelMembers,
+        vertical,
+        result,
+        evaluations: evaluations.map((e) => ({
+          ...e,
+          preferred_vertical_name: e.preferred_vertical_id
+            ? verticalNames.get(e.preferred_vertical_id) ?? null
+            : null,
+          scores: e.scores.map((s) => ({
+            ...s,
+            criterion_name: criteriaById.get(s.criterion_id)?.name ?? s.criterion_id,
+            max_score: criteriaById.get(s.criterion_id)?.max_score ?? null,
+          })),
+        })),
+      });
+    } catch (e) {
+      next(e);
+    }
+  });
+
   r.post('/candidates', requireAuth, async (req: AuthedRequest, res, next) => {
     try {
       isAdmin(req);

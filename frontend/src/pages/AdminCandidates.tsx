@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, downloadCsv, ApiError, API_URL } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { ConfirmDialog } from '../components/Ui';
+import { AdminCandidateProfile } from '../components/AdminCandidateProfile';
 import { SortableTh, useSort } from '../components/Sortable';
 import type { Candidate, Panel } from '../lib/types';
 
@@ -25,6 +26,7 @@ export function AdminCandidates() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<Partial<Candidate> | null>(null);
+  const [profileId, setProfileId] = useState<string | null>(null);
   const [confirmArchive, setConfirmArchive] = useState<Candidate | null>(null);
   const [csvText, setCsvText] = useState('');
   const [importResult, setImportResult] = useState<unknown>(null);
@@ -322,7 +324,11 @@ export function AdminCandidates() {
           <tbody>
             {sort.sorted.map((c) => (
               <tr key={c.id} style={c.archived_at ? { opacity: 0.55 } : undefined}>
-                <td>{c.full_name}</td>
+                <td>
+                  <button className="btn secondary small" onClick={() => setProfileId(c.id)}>
+                    {c.full_name}
+                  </button>
+                </td>
                 <td>{c.branch}</td>
                 <td className="mono">{c.application_id ?? '—'}</td>
                 <td>{panels.find((p) => p.id === c.panel_id)?.name ?? c.panel_id}</td>
@@ -480,6 +486,8 @@ export function AdminCandidates() {
         onCancel={() => setConfirmArchive(null)}
         onConfirm={() => confirmArchive && void doArchive(confirmArchive, true)}
       />
+
+      {profileId && <AdminCandidateProfile candidateId={profileId} onClose={() => setProfileId(null)} />}
     </>
   );
 }

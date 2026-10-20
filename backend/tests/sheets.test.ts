@@ -60,7 +60,14 @@ describe('Applicant export helpers', () => {
     const name = columnIndex(APPLICANT_EXPORT_HEADER, ['full_name', 'applicant_name']);
     expect(key).toBe(0);
     expect(name).toBe(1);
-    for (const field of ['vertical', 'completion', 'final_average', 'judge_count']) {
+    for (const field of [
+      'vertical',
+      'completion',
+      'final_average',
+      'judge_count',
+      'preferred_vertical_interview',
+      'judge_remarks_interview',
+    ]) {
       expect(columnIndex(APPLICANT_EXPORT_HEADER, [field])).not.toBeNull();
     }
     expect(new Set(APPLICANT_EXPORT_HEADER).size).toBe(APPLICANT_EXPORT_HEADER.length);

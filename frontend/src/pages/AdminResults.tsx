@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useState } from 'react';
 import { api, downloadCsv } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { SortableTh, useSort } from '../components/Sortable';
+import { AdminCandidateProfile } from '../components/AdminCandidateProfile';
 import type { Panel, ResultRow, Vertical } from '../lib/types';
 
 const SERVER_SORT_KEYS = ['name', 'branch', 'average', 'priority', 'roll', 'created'];
@@ -19,6 +20,7 @@ export function AdminResults() {
   const [evalStatus, setEvalStatus] = useState('');
   const [interviewStatus, setInterviewStatus] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [profileId, setProfileId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const getSortValue = useCallback((r: ResultRow, key: string): unknown => {
@@ -186,6 +188,13 @@ export function AdminResults() {
                     </button>
                     {r.roll_number ? <span className="muted mono"> {r.roll_number}</span> : null}
                     {r.priority ? <span className="badge blue">P{r.priority}</span> : null}
+                    <button
+                      className="btn secondary small"
+                      style={{ marginLeft: '0.4rem' }}
+                      onClick={() => setProfileId(r.candidate_id)}
+                    >
+                      Full profile
+                    </button>
                   </td>
                   <td>{r.branch}</td>
                   <td>{r.panel_name}</td>
@@ -263,6 +272,8 @@ export function AdminResults() {
         </table>
         {rows.length === 0 && <div className="empty">No candidates match the filters.</div>}
       </div>
+
+      {profileId && <AdminCandidateProfile candidateId={profileId} onClose={() => setProfileId(null)} />}
     </>
   );
 }

@@ -637,6 +637,51 @@ describe('synchronization', () => {
   });
 });
 
+describe('admin candidate profile', () => {
+  let app: ReturnType<typeof makeApp>['app'];
+  let store: MemoryStore;
+  let s: Seed;
+  beforeEach(async () => {
+    ({ app, store } = makeApp());
+    s = await seed(store);
+    await request(app).post('/api/panels/verify').set(auth(s.judge1Id)).send({ code: 'PANELCODE' });
+  });
+
+  it('returns the full admin profile with every judge evaluation and criterion', async () => {
+    await request(app)
+      .post('/api/evaluations')
+      .set(auth(s.judge1Id))
+      .send({
+        id: randomUUID(),
+        candidate_id: s.candidateId,
+        round_id: s.roundId,
+        feedback: 'Strong technical signal',
+        scores: { [s.criteriaIds[0]]: 9, [s.criteriaIds[1]]: 8 },
+      });
+    const res = await request(app)
+      .get(`/api/admin/candidates/${s.candidateId}/profile`)
+      .set(auth(s.adminId));
+    expect(res.status).toBe(200);
+    expect(res.body.candidate.full_name).toBe('Ada Lovelace');
+    expect(res.body.panel.name).toBe('Panel A');
+    expect(res.body.panel_members[0].judge_name).toBe('Judge One');
+    expect(res.body.result.evaluation_count).toBe(1);
+    expect(res.body.evaluations).toHaveLength(1);
+    expect(res.body.evaluations[0].judge_name).toBe('Judge One');
+    expect(res.body.evaluations[0].feedback).toBe('Strong technical signal');
+    expect(res.body.evaluations[0].scores).toHaveLength(2);
+    expect(res.body.evaluations[0].scores[0].criterion_name).toBe('Technical');
+    expect(res.body.evaluations[0].scores[0].max_score).toBe(10);
+  });
+
+  it('forbids judges from the admin profile endpoint', async () => {
+    const res = await request(app)
+      .get(`/api/admin/candidates/${s.candidateId}/profile`)
+      .set(auth(s.judge1Id));
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('exports', () => {
   let app: ReturnType<typeof makeApp>['app'];
   let store: MemoryStore;

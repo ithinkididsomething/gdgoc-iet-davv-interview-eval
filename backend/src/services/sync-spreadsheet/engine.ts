@@ -186,9 +186,27 @@ function preferredVerticalLabels(
   return preferences;
 }
 
-/** Columns M-S: the evaluation block shared by exports and queue pushes. */
-function evaluationValues(row: ResultRow | undefined, preferences: string[]): unknown[] {
-  if (!row) return ['', '', '', '', '', '', preferences.join(', ')];
+/** Every judge's written remark for a candidate, labelled and newest-last. */
+function judgeRemarks(evaluations: EvaluationWithScores[]): Map<string, string[]> {
+  const remarks = new Map<string, string[]>();
+  for (const e of [...evaluations].sort((a, b) => a.submitted_at.localeCompare(b.submitted_at))) {
+    const text = (e.feedback ?? '').trim();
+    if (!text) continue;
+    const label = e.judge_name ? `${e.judge_name}: ${text}` : text;
+    const list = remarks.get(e.candidate_id) ?? [];
+    list.push(label);
+    remarks.set(e.candidate_id, list);
+  }
+  return remarks;
+}
+
+/** Columns M-T: the evaluation block shared by exports and queue pushes. */
+function evaluationValues(
+  row: ResultRow | undefined,
+  preferences: string[],
+  remarks: string[],
+): unknown[] {
+  if (!row) return ['', '', '', '', '', '', preferences.join(', '), remarks.join('\n')];
   const judgeCount = row.judge_ratings.length;
   const individualScores = row.judge_ratings.map((j) => (j.score === null ? '' : Number(j.score)));
   return [
@@ -199,6 +217,7 @@ function evaluationValues(row: ResultRow | undefined, preferences: string[]): un
     row.average_score === null ? '' : row.average_score,
     judgeCount,
     preferences.join(', '),
+    remarks.join('\n'),
   ];
 }
 
@@ -207,6 +226,7 @@ function evaluationRow(
   item: SpreadsheetSyncItem,
   results: Map<string, ResultRow>,
   preferences: Map<string, string[]>,
+  remarks: Map<string, string[]>,
 ): unknown[] | null {
   const row = results.get(item.entity_id);
   if (!row) return null;
@@ -217,7 +237,11 @@ function evaluationRow(
     row.shift ?? '',
     row.branch,
     row.panel_name,
-    ...evaluationValues(row, preferences.get(item.entity_id) ?? []),
+    ...evaluationValues(
+      row,
+      preferences.get(item.entity_id) ?? [],
+      remarks.get(item.entity_id) ?? [],
+    ),
   ];
 }
 
@@ -235,6 +259,7 @@ const EVAL_HEADER = [
   'final_average',
   'judge_count',
   'preferred_vertical_interview',
+  'judge_remarks_interview',
 ];
 
 interface PushPlan {
@@ -342,7 +367,9 @@ export async function pushToSheets(store: Store, config: AppConfig, actorId: str
   const verticals = await store.listVerticals();
   const byId = new Map(verticals.map((v) => [v.id, v]));
   const verticalNames = new Map(verticals.map((v) => [v.id, v.name]));
-  const preferences = preferredVerticalLabels(await store.listEvaluations({ admin: true }), verticalNames);
+  const evaluations = await store.listEvaluations({ admin: true });
+  const preferences = preferredVerticalLabels(evaluations, verticalNames);
+  const remarks = judgeRemarks(evaluations);
 
   const plans = new Map<string, PushPlan>();
   const resolvedCache = new Map<string, { reference: SheetsConnectionConfig; tabTitle: string }>();
@@ -368,7 +395,7 @@ export async function pushToSheets(store: Store, config: AppConfig, actorId: str
       summary.pushed.push({ id: item.id, status: 'done' });
       continue;
     }
-    const row = evaluationRow(item, results, preferences);
+    const row = evaluationRow(item, results, preferences, remarks);
     if (!row) {
       await logError(item, 'candidate no longer exists', true);
       continue;
@@ -459,6 +486,7 @@ export const APPLICANT_EXPORT_HEADER = [
   'Final Average',
   'Judge Count',
   'Preferred Vertical (Interview)',
+  'Judge Remarks (Interview)',
 ];
 
 export interface ExportSummary {
@@ -499,6 +527,7 @@ export async function exportApplicantsToSheets(
   const panelNames = new Map(panels.map((p) => [p.id, p.name]));
   const verticalNames = new Map(verticals.map((v) => [v.id, v.name]));
   const preferences = preferredVerticalLabels(evaluations, verticalNames);
+  const remarks = judgeRemarks(evaluations);
   const resultByCandidate = new Map(resultsList.map((r) => [r.candidate_id, r]));
   const groups = new Map<string, Candidate[]>();
   const unassigned: Candidate[] = [];
@@ -525,7 +554,11 @@ export async function exportApplicantsToSheets(
     c.github_url ?? '',
     c.team_message ?? '',
     c.remarks ?? '',
-    ...evaluationValues(resultByCandidate.get(c.id), preferences.get(c.id) ?? []),
+    ...evaluationValues(
+      resultByCandidate.get(c.id),
+      preferences.get(c.id) ?? [],
+      remarks.get(c.id) ?? [],
+    ),
   ];
 
   const writeTab = async (
