@@ -227,7 +227,7 @@ export function AdminResults() {
                   <td>{r.panel_name}</td>
                   <td>
                     {r.vertical_name ?? <span className="muted">—</span>}
-                    {r.shift ? <div className="muted" style={{ fontSize: '0.75rem' }}>{r.shift}</div> : null}
+                    {r.shift ? <span className="muted"> · {r.shift}</span> : null}
                   </td>
                   <td>
                     {r.average_score === null ? (

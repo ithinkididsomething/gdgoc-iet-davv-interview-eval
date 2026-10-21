@@ -2096,6 +2096,32 @@ table.data td.actions-cell {
   gap: 0.35rem;
 }
 
+/* Admin tables: every row stays on one visual line; wide tables scroll. */
+.table-wrap > table.data {
+  min-width: max-content;
+}
+.table-wrap > table.data th,
+.table-wrap > table.data td {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.table-wrap > table.data .candidate-cell {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+}
+.table-wrap > table.data .candidate-meta,
+.table-wrap > table.data .candidate-sub {
+  flex-wrap: nowrap;
+}
+.criterion-description {
+  display: inline-block;
+  max-width: 42ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
 @media (max-width: 980px) {
   .criterion-form {
     grid-template-columns: repeat(3, minmax(0, 1fr));

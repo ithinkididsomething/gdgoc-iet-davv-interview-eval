@@ -283,7 +283,12 @@ export function AdminRounds() {
                   <tr key={c.id} style={!c.is_active ? { opacity: 0.5 } : undefined}>
                     <td>
                       {c.name}
-                      {c.description && <div className="muted">{c.description}</div>}
+                      {c.description && (
+                        <span className="muted criterion-description" title={c.description}>
+                          {' · '}
+                          {c.description}
+                        </span>
+                      )}
                     </td>
                     <td>
                       {c.min_score}–{c.max_score}
