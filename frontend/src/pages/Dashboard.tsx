@@ -22,6 +22,9 @@ export function Dashboard() {
   return (
     <>
       <h1>Welcome, {profile?.full_name?.split(' ')[0] || 'there'}</h1>
+      <p className="muted">
+        Review your panels, keep offline data ready, and move candidates through the interview process.
+      </p>
       {isOfflineSession && (
         <div className="alert warn">
           You are using a locally stored offline session, not a fresh server sign-in. Synchronization

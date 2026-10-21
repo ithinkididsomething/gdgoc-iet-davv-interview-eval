@@ -184,6 +184,7 @@ export function AdminCandidates() {
   return (
     <>
       <h1>Candidates</h1>
+      <p className="muted">Import, edit, and organize applicants across every recruitment round.</p>
       {error && <div className="alert error">{error}</div>}
       {notice && <div className="alert success">{notice}</div>}
 

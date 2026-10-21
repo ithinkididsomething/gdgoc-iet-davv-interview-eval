@@ -187,6 +187,7 @@ export function AdminPanels() {
   return (
     <>
       <h1>Panels &amp; verification codes</h1>
+      <p className="muted">Create panels, assign interviewers, and share secure verification codes.</p>
       {error && <div className="alert error">{error}</div>}
       {notice && <div className="alert success">{notice}</div>}
 

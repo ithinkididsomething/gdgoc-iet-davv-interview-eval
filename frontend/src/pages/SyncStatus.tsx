@@ -33,6 +33,7 @@ export function SyncStatus() {
   return (
     <>
       <h1>Synchronization</h1>
+      <p className="muted">Monitor queued work, retry failed uploads, and review conflicts on this device.</p>
       <div className="card">
         <div className="grid cols-3">
           <div className="stat yellow">

@@ -68,7 +68,7 @@ export function SortableTh({
       <button type="button" className={`th-sort${active ? ' active' : ''}`} onClick={() => state.toggleSort(sortKey)}>
         <span>{label}</span>
         <span className="th-sort-icon" aria-hidden="true">
-          {active ? (state.sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+          {active ? (state.sortDir === 'asc' ? '\u2191' : '\u2193') : '\u2195'}
         </span>
       </button>
     </th>

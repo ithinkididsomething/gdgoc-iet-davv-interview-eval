@@ -128,6 +128,7 @@ export function MyEvaluations() {
   return (
     <>
       <h1>My evaluations</h1>
+      <p className="muted">Your saved drafts and submitted evaluations across every interview round.</p>
       {error && <div className="alert error">{error}</div>}
       {notice && <div className="alert success">{notice}</div>}
       <h2>On this device</h2>

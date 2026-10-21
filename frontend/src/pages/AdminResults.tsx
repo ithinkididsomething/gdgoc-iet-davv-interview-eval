@@ -112,6 +112,7 @@ export function AdminResults() {
   return (
     <>
       <h1>Results</h1>
+      <p className="muted">Review completion, final averages, and individual interviewer ratings.</p>
       {error && <div className="alert error">{error}</div>}
       <div className="card">
         <div className="filters">

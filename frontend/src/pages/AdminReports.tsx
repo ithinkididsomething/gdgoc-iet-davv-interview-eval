@@ -155,6 +155,7 @@ export function AdminReports() {
   return (
     <>
       <h1>Reports &amp; exports</h1>
+      <p className="muted">Generate recruitment exports and synchronize evaluation data with Google Sheets.</p>
       {error && <div className="alert error">{error}</div>}
       {notice && <div className="alert success">{notice}</div>}
 
