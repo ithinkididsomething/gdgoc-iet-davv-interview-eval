@@ -97,7 +97,7 @@ export function AdminJudges() {
       {error && <div className="alert error">{error}</div>}
       {notice && <div className="alert success">{notice}</div>}
       <div className="table-wrap card" style={{ padding: 0 }}>
-        <table className="data">
+        <table className="data wide-table">
           <thead>
             <tr>
               <SortableTh label="Name" sortKey="name" state={sort} />

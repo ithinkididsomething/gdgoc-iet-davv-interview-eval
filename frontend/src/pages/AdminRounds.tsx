@@ -192,20 +192,19 @@ export function AdminRounds() {
 
       <div className="card">
         <h3>New round</h3>
-        <div className="filters">
-          <div>
+        <div className="filters form-line">
+          <div className="field-grow">
             <label>Round name</label>
             <input
               value={newRound.name}
               onChange={(e) => setNewRound({ ...newRound, name: e.target.value })}
             />
           </div>
-          <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+          <label className="checkbox-field">
             <input
               type="checkbox"
               checked={newRound.allow_edit_after_submit}
               onChange={(e) => setNewRound({ ...newRound, allow_edit_after_submit: e.target.checked })}
-              style={{ width: 'auto' }}
             />
             Allow judges to edit after submit
           </label>
@@ -218,14 +217,14 @@ export function AdminRounds() {
       <div className="card">
         <h3>Existing rounds</h3>
         <div className="table-wrap">
-          <table className="data">
+          <table className="data wide-table">
             <thead>
               <tr>
                 <SortableTh label="Name" sortKey="name" state={roundSort} />
                 <SortableTh label="Open" sortKey="open" state={roundSort} />
                 <SortableTh label="Edits allowed" sortKey="edits" state={roundSort} />
                 <SortableTh label="Closes" sortKey="closes" state={roundSort} />
-                <th>Actions</th>
+                <th className="actions-head">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -249,7 +248,9 @@ export function AdminRounds() {
                     </button>
                   </td>
                   <td>{r.allow_edit_after_submit ? 'Yes' : 'No'}</td>
-                  <td className="muted">{r.closes_at ? `closes ${new Date(r.closes_at).toLocaleString()}` : ''}</td>
+                  <td className="muted">
+                    {r.closes_at ? new Date(r.closes_at).toLocaleString() : <span className="muted">Not scheduled</span>}
+                  </td>
                   <td className="actions-cell">
                     <button className="btn danger small" onClick={() => void deleteRound(r)}>
                       Delete
@@ -267,14 +268,14 @@ export function AdminRounds() {
         <div className="card">
           <h3>Criteria for selected round</h3>
           <div className="table-wrap">
-            <table className="data">
+            <table className="data wide-table">
               <thead>
                 <tr>
                   <SortableTh label="Name" sortKey="name" state={criterionSort} />
                   <SortableTh label="Range" sortKey="range" state={criterionSort} />
                   <SortableTh label="Weight" sortKey="weight" state={criterionSort} />
                   <SortableTh label="Active" sortKey="active" state={criterionSort} />
-                  <th>Actions</th>
+                  <th className="actions-head">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -306,25 +307,15 @@ export function AdminRounds() {
               <div className="empty">No criteria — judges will submit a single overall score.</div>
             )}
           </div>
-          <div className="filters mt">
-            <div>
+          <div className="criterion-form mt">
+            <div className="field field-name">
               <label>Criterion name</label>
               <input
                 value={newCriterion.name}
                 onChange={(e) => setNewCriterion({ ...newCriterion, name: e.target.value })}
               />
             </div>
-            <div style={{ flex: '1 1 100%' }}>
-              <label>Description</label>
-              <textarea
-                rows={2}
-                maxLength={500}
-                value={newCriterion.description}
-                onChange={(e) => setNewCriterion({ ...newCriterion, description: e.target.value })}
-                placeholder="What judges should look for (optional)"
-              />
-            </div>
-            <div>
+            <div className="field">
               <label>Min</label>
               <input
                 type="number"
@@ -332,7 +323,7 @@ export function AdminRounds() {
                 onChange={(e) => setNewCriterion({ ...newCriterion, min_score: Number(e.target.value) })}
               />
             </div>
-            <div>
+            <div className="field">
               <label>Max</label>
               <input
                 type="number"
@@ -340,7 +331,7 @@ export function AdminRounds() {
                 onChange={(e) => setNewCriterion({ ...newCriterion, max_score: Number(e.target.value) })}
               />
             </div>
-            <div>
+            <div className="field">
               <label>Weight</label>
               <input
                 type="number"
@@ -353,6 +344,16 @@ export function AdminRounds() {
             <button className="btn" onClick={() => void createCriterion()} disabled={!newCriterion.name.trim()}>
               Add criterion
             </button>
+            <div className="field field-description">
+              <label>Description</label>
+              <textarea
+                rows={2}
+                maxLength={500}
+                value={newCriterion.description}
+                onChange={(e) => setNewCriterion({ ...newCriterion, description: e.target.value })}
+                placeholder="What judges should look for (optional)"
+              />
+            </div>
           </div>
         </div>
       )}

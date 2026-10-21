@@ -189,53 +189,56 @@ export function AdminCandidates() {
       {notice && <div className="alert success">{notice}</div>}
 
       <div className="card">
-        <div className="filters">
-          <div>
-            <label>Search</label>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name or application ID" />
+        <div className="admin-toolbar">
+          <div className="filters filter-group">
+            <div>
+              <label>Search</label>
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name or application ID" />
+            </div>
+            <div>
+              <label>Branch</label>
+              <input value={branch} onChange={(e) => setBranch(e.target.value)} />
+            </div>
+            <div>
+              <label>Panel</label>
+              <select value={panelId} onChange={(e) => setPanelId(e.target.value)}>
+                <option value="">All</option>
+                {panels.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-          <div>
-            <label>Branch</label>
-            <input value={branch} onChange={(e) => setBranch(e.target.value)} />
+          <div className="toolbar-actions">
+            <label className="checkbox-field">
+              <input
+                type="checkbox"
+                checked={includeArchived}
+                onChange={(e) => setIncludeArchived(e.target.checked)}
+              />
+              Show archived
+            </label>
+            <button
+              className="btn secondary"
+              onClick={() => {
+                void (async () => {
+                  const token = await getToken();
+                  if (token) await downloadCsv('/candidates/import/template.csv', token, 'candidates-template.csv');
+                })().catch((e) => setError(e instanceof Error ? e.message : 'Download failed'));
+              }}
+            >
+              Download CSV template
+            </button>
+            <button
+              className="btn"
+              onClick={() => setEditing({ panel_id: panels[0]?.id ?? '', branch: '' })}
+              disabled={panels.length === 0}
+            >
+              Add candidate
+            </button>
           </div>
-          <div>
-            <label>Panel</label>
-            <select value={panelId} onChange={(e) => setPanelId(e.target.value)}>
-              <option value="">All</option>
-              {panels.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-            <input
-              type="checkbox"
-              checked={includeArchived}
-              onChange={(e) => setIncludeArchived(e.target.checked)}
-              style={{ width: 'auto' }}
-            />
-            Show archived
-          </label>
-          <button
-            className="btn"
-            onClick={() => setEditing({ panel_id: panels[0]?.id ?? '', branch: '' })}
-            disabled={panels.length === 0}
-          >
-            Add candidate
-          </button>
-          <button
-            className="btn secondary"
-            onClick={() => {
-              void (async () => {
-                const token = await getToken();
-                if (token) await downloadCsv('/candidates/import/template.csv', token, 'candidates-template.csv');
-              })().catch((e) => setError(e instanceof Error ? e.message : 'Download failed'));
-            }}
-          >
-            Download CSV template
-          </button>
         </div>
       </div>
 
@@ -311,7 +314,7 @@ export function AdminCandidates() {
       )}
 
       <div className="table-wrap card" style={{ padding: 0 }}>
-        <table className="data">
+        <table className="data wide-table">
           <thead>
             <tr>
               <SortableTh label="Name" sortKey="name" state={sort} />
@@ -338,7 +341,7 @@ export function AdminCandidates() {
                   <span className="badge blue">{c.shortlisting_status}</span>
                   {c.archived_at && <span className="badge err">archived</span>}
                 </td>
-                <td>
+                <td className="actions-cell">
                   <div className="btn-row">
                     <button className="btn secondary small" onClick={() => setEditing(c)}>
                       Edit

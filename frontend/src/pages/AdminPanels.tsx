@@ -193,8 +193,8 @@ export function AdminPanels() {
 
       <div className="card">
         <h3>New panel</h3>
-        <div className="filters">
-          <div>
+        <div className="filters form-line">
+          <div className="field-grow">
             <label>Panel name</label>
             <input value={newName} onChange={(e) => setNewName(e.target.value)} />
           </div>
@@ -219,11 +219,11 @@ export function AdminPanels() {
             <p className="muted">
               Total evaluations per candidate: {panel.members.length} (one per panel judge)
             </p>
-            <ul>
+            <ul className="judge-list">
               {panel.members.map((m) => (
-                <li key={m.judge_id}>
-                  {m.judge_name || m.judge_id}{' '}
-                  {m.verified_at ? <span className="badge ok">verified</span> : <span className="badge blue">assigned</span>}{' '}
+                <li className="judge-row" key={m.judge_id}>
+                  <span className="judge-name">{m.judge_name || m.judge_id}</span>
+                  {m.verified_at ? <span className="badge ok">verified</span> : <span className="badge blue">assigned</span>}
                   <button
                     className="btn danger small"
                     onClick={() => setConfirmRemove({ panel, member: m })}
@@ -234,8 +234,8 @@ export function AdminPanels() {
               ))}
               {panel.members.length === 0 && <li className="muted">No judges assigned.</li>}
             </ul>
-            <div className="filters">
-              <div style={{ flex: 1 }}>
+            <div className="filters panel-actions">
+              <div className="field-grow">
                 <label>Assign registered judge by email</label>
                 <input
                   value={judgeEmail}
@@ -289,8 +289,8 @@ export function AdminPanels() {
                   <strong className="mono" style={{ letterSpacing: '0.1em' }}>{plaintext}</strong>
                 </div>
               )}
-              <div className="filters">
-                <div>
+              <div className="filters form-line">
+                <div className="field-grow">
                   <label>Label (optional)</label>
                   <input value={codeLabel} onChange={(e) => setCodeLabel(e.target.value)} />
                 </div>
@@ -305,7 +305,7 @@ export function AdminPanels() {
                 </button>
               </div>
               <div className="table-wrap mt">
-                <table className="data">
+                <table className="data wide-table">
                   <thead>
                     <tr>
                       <SortableTh label="Preview" sortKey="preview" state={codeSort} />

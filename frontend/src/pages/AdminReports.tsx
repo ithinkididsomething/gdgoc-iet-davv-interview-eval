@@ -301,7 +301,7 @@ export function AdminReports() {
             ) : (
               <p className="warn">No vertical has a worksheet mapped yet — pull will skip them.</p>
             )}
-            <div className="btn-row">
+            <div className="btn-row sync-actions">
               <button className="btn secondary" disabled={busy} onClick={() => void writeApplicants()}>
                 Write applicants to sheet
               </button>

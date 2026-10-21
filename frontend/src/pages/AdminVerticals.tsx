@@ -115,7 +115,7 @@ export function AdminVerticals() {
       {notice && <div className="alert success">{notice}</div>}
 
       <div className="table-wrap card" style={{ padding: 0 }}>
-        <table className="data">
+        <table className="data verticals-table">
           <thead>
             <tr>
               <SortableTh label="#" sortKey="order" state={sort} title="Configured sort order" />
@@ -170,13 +170,13 @@ export function AdminVerticals() {
                     />
                   )}
                 </td>
-                <td>
+                <td className="checkbox-cell">
                   <input
                     type="checkbox"
+                    aria-label={`${v.name} active`}
                     checked={v.is_active}
                     disabled={busy}
                     onChange={(e) => void patch(v.id, { is_active: e.target.checked })}
-                    style={{ width: 'auto' }}
                   />
                 </td>
               </tr>
@@ -194,8 +194,8 @@ export function AdminVerticals() {
 
       <div className="card mt">
         <h3>Add vertical</h3>
-        <div className="filters">
-          <div>
+        <div className="filters form-line">
+          <div className="field-grow">
             <label>Key</label>
             <input
               value={creating.key}
@@ -203,7 +203,7 @@ export function AdminVerticals() {
               placeholder="sponsorship"
             />
           </div>
-          <div>
+          <div className="field-grow">
             <label>Name</label>
             <input
               value={creating.name}
@@ -211,7 +211,7 @@ export function AdminVerticals() {
               placeholder="Sponsorship"
             />
           </div>
-          <div>
+          <div className="field-grow">
             <label>Worksheet</label>
             <input
               value={creating.worksheet}

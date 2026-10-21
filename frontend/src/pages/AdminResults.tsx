@@ -115,7 +115,7 @@ export function AdminResults() {
       <p className="muted">Review completion, final averages, and individual interviewer ratings.</p>
       {error && <div className="alert error">{error}</div>}
       <div className="card">
-        <div className="filters">
+        <div className="filters filter-grid">
           <div>
             <label>Name / application ID</label>
             <input value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -173,17 +173,19 @@ export function AdminResults() {
               <option value="no_show">No show</option>
             </select>
           </div>
-          <button className="btn" onClick={() => void exportCsv('summary')}>
-            Export summary CSV
-          </button>
+        </div>
+        <div className="toolbar-actions results-actions">
           <button className="btn secondary" onClick={() => void exportCsv('detailed')}>
             Export detailed CSV
+          </button>
+          <button className="btn" onClick={() => void exportCsv('summary')}>
+            Export summary CSV
           </button>
         </div>
       </div>
 
       <div className="table-wrap card" style={{ padding: 0 }}>
-        <table className="data">
+        <table className="data results-table">
           <thead>
             <tr>
               <SortableTh label="Candidate" sortKey="name" state={sort} />
@@ -201,21 +203,23 @@ export function AdminResults() {
               <Fragment key={r.candidate_id}>
                 <tr>
                   <td>
-                    <button
-                      className="btn secondary small"
-                      onClick={() => setExpanded(expanded === r.candidate_id ? null : r.candidate_id)}
-                    >
-                      {expanded === r.candidate_id ? '▾' : '▸'} {r.full_name}
-                    </button>
-                    {r.roll_number ? <span className="muted mono"> {r.roll_number}</span> : null}
-                    {r.priority ? <span className="badge blue">P{r.priority}</span> : null}
-                    <button
-                      className="btn secondary small"
-                      style={{ marginLeft: '0.4rem' }}
-                      onClick={() => setProfileId(r.candidate_id)}
-                    >
-                      Full profile
-                    </button>
+                    <div className="candidate-cell">
+                      <div className="candidate-meta">
+                        <button
+                          className="btn secondary small"
+                          onClick={() => setExpanded(expanded === r.candidate_id ? null : r.candidate_id)}
+                        >
+                          {expanded === r.candidate_id ? '\u25BE' : '\u25B8'} {r.full_name}
+                        </button>
+                      </div>
+                      <div className="candidate-sub">
+                        {r.roll_number ? <span className="muted mono">{r.roll_number}</span> : null}
+                        {r.priority ? <span className="badge blue">P{r.priority}</span> : null}
+                        <button className="btn secondary small" onClick={() => setProfileId(r.candidate_id)}>
+                          Full profile
+                        </button>
+                      </div>
+                    </div>
                   </td>
                   <td>{r.branch}</td>
                   <td>{r.panel_name}</td>
