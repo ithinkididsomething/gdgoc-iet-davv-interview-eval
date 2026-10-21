@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { api, downloadCsv } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { scheduleSheetSync } from '../lib/sheetSync';
 import { SortableTh, useSort } from '../components/Sortable';
 import { AdminCandidateProfile } from '../components/AdminCandidateProfile';
 import { ConfirmDialog } from '../components/Ui';
@@ -100,6 +101,7 @@ export function AdminResults() {
       const token = await getToken();
       if (!token) throw new Error('Session expired. Sign in again.');
       await api(`/evaluations/${deleteTarget.rating.evaluation_id}`, { method: 'DELETE', token });
+      scheduleSheetSync(getToken, 0);
       setDeleteTarget(null);
       await load();
     } catch (e) {

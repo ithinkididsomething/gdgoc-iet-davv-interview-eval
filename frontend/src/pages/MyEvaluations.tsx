@@ -4,6 +4,7 @@ import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { deleteOutboxItem, listOutbox } from '../lib/idb';
 import { useOnline } from '../lib/net';
+import { scheduleSheetSync } from '../lib/sheetSync';
 import { useSync } from '../lib/syncContext';
 import { SortableTh, useSort } from '../components/Sortable';
 import { ConfirmDialog } from '../components/Ui';
@@ -113,6 +114,7 @@ export function MyEvaluations() {
         if (!(e instanceof ApiError) || e.status !== 404) throw e;
       }
       await deleteOutboxItem(deleteTarget.id);
+      scheduleSheetSync(getToken, 0);
       await refresh();
       setLocal(await listOutbox());
       setServer((prev) => (prev ? prev.filter((e) => e.id !== deleteTarget.id) : prev));
