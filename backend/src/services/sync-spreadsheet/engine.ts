@@ -1,6 +1,6 @@
 import { columnIndex, ensureTab, findRowByKey, readTab, spreadsheetUrl, writeBatch, appendRows, isConfigured, listTabs, parseSheetLink, overwriteTab, sanitizeTabTitle, SheetsUnavailableError } from '../sheets/googleSheets.js';
 import type { SheetsConnectionConfig } from '../sheets/googleSheets.js';
-import { COLUMN_ALIASES, normalizeHeader } from '../importer/columns.js';
+import { COLUMN_ALIASES, looksLikeResultsExport, normalizeHeader } from '../importer/columns.js';
 import type { AppConfig } from '../../config.js';
 import type {
   Store,
@@ -81,6 +81,10 @@ export async function pullFromSheets(store: Store, config: AppConfig, actorId: s
         continue;
       }
       const headers = (values[0] ?? []).map((h) => String(h ?? '').trim());
+      if (looksLikeResultsExport(headers)) {
+        summary.skipped.push(`worksheet "${tab}" is a results export, not applicant data`);
+        continue;
+      }
       const mapped: Record<string, number> = {};
       for (const [field, aliases] of Object.entries(COLUMN_ALIASES)) {
         const idx = columnIndex(headers, [field, ...aliases.map((a) => a.toLowerCase())]);

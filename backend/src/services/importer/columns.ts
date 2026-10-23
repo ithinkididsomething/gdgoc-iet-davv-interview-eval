@@ -58,6 +58,28 @@ export function looksLikeApplicantSheet(headers: unknown[]): boolean {
   return mapped.has('full_name');
 }
 
+/** Columns emitted by the results exports; these sheets are never applicants. */
+const RESULTS_EXPORT_MARKERS = [
+  'average score',
+  'evaluation count',
+  'expected evaluations',
+  'evaluation status',
+  'shortlisting status',
+  'overall score',
+  'criterion scores',
+];
+
+/**
+ * A results export also contains an applicant-name column, so it would
+ * otherwise be accepted by the importer and re-create every candidate under a
+ * synthetic sheet (e.g. "Sheet1"). Reject it before taking any rows.
+ */
+export function looksLikeResultsExport(headers: unknown[]): boolean {
+  const normalized = new Set(headers.map((h) => normalizeHeader(h)));
+  if (!normalized.has('candidate id')) return false;
+  return RESULTS_EXPORT_MARKERS.filter((h) => normalized.has(h)).length >= 2;
+}
+
 /** Stable identity for a row: prefer roll number, fall back to email, then name+sheet. */
 export function rowKeyFor(
   fields: Map<string, number>,

@@ -5,6 +5,7 @@ import {
   extractProfileUrl,
   mapColumns,
   looksLikeApplicantSheet,
+  looksLikeResultsExport,
   normalizeHeader,
   rowKeyFor,
 } from './columns.js';
@@ -96,7 +97,8 @@ export function parseWorkbook(buf: Buffer, filename: string): ImportReport {
     const headerIdx = findHeaderRow(matrix);
     const headers = (matrix[headerIdx] ?? []).map((h) => cellToString(h));
     const fields = mapColumns(headers);
-    const isApplicant = looksLikeApplicantSheet(headers);
+    const isResultsExport = looksLikeResultsExport(headers);
+    const isApplicant = !isResultsExport && looksLikeApplicantSheet(headers);
     const audit: SheetAudit = {
       sheet: sheetName,
       rows: matrix.length - headerIdx - 1,
@@ -104,8 +106,13 @@ export function parseWorkbook(buf: Buffer, filename: string): ImportReport {
       usedAsSource: isApplicant,
       headers,
     };
+    if (isResultsExport) {
+      audit.reason = 'results export, not applicant data';
+      report.sheets.push(audit);
+      continue;
+    }
     if (!isApplicant) {
-      audit.reason = fields.has('full_name') ? '' : 'no applicant-name column in header';
+      audit.reason = 'no applicant-name column in header';
       report.sheets.push(audit);
       continue;
     }

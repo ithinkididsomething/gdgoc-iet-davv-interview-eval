@@ -77,6 +77,29 @@ const designRows = (): (string | number | null)[][] => [
   ['APP-77', 'Meera Iyer', 'meera@example.com', 'ECE', 'Design', 'Evening'],
 ];
 
+const RESULTS_SUMMARY_HEADER = [
+  'candidate_id',
+  'full_name',
+  'branch',
+  'application_id',
+  'panel',
+  'average_score',
+  'evaluation_count',
+  'expected_evaluations',
+  'evaluation_status',
+  'interview_status',
+  'shortlisting_status',
+];
+
+function resultsSummaryCsv(): Buffer {
+  return Buffer.from(
+    [
+      RESULTS_SUMMARY_HEADER.join(','),
+      ['cand-1', 'Asha Rao', 'CSE', '26E1001', 'Panel 1.1', '4.5', '2', '2', 'completed', 'completed', 'pending'].join(','),
+    ].join('\n'),
+  );
+}
+
 describe('workbook importer (parse)', () => {
   it('parses per-vertical sheets with their own headers and audits skipped sheets', () => {
     const buf = buildWorkbook({
@@ -118,6 +141,14 @@ describe('workbook importer (parse)', () => {
     const report = parseWorkbook(buf, 'mixed.xlsx');
     expect(report.errors.filter((e) => e.sheet === 'Notes')).toHaveLength(0);
     expect(report.sheets.find((s) => s.sheet === 'Notes')?.usedAsSource).toBe(false);
+  });
+
+  it('skips results-summary exports instead of treating them as applicants', () => {
+    const report = parseWorkbook(resultsSummaryCsv(), 'results-summary (1).csv');
+    expect(report.applicants).toHaveLength(0);
+    expect(report.sheets).toHaveLength(1);
+    expect(report.sheets[0].usedAsSource).toBe(false);
+    expect(report.sheets[0].reason).toMatch(/results export/);
   });
 });
 
@@ -166,6 +197,20 @@ describe('import upsert (store)', () => {
     const { candidates } = (await request(app).get('/api/candidates').set(auth(adminId))).body;
     const verticals = await store.listVerticals();
     expect(candidates[0].vertical_id).toBe(verticals[0].id);
+  });
+
+  it('does not recreate candidates when a results summary is uploaded', async () => {
+    const { app, store } = makeApp();
+    const adminId = await seedAdmin(store);
+    const res = await request(app)
+      .post('/api/admin/applicants/import')
+      .set(auth(adminId))
+      .attach('file', resultsSummaryCsv(), 'results-summary (1).csv');
+    expect(res.status).toBe(201);
+    expect(res.body.created).toBe(0);
+    expect(res.body.updated).toBe(0);
+    expect(res.body.sheets[0].usedAsSource).toBe(false);
+    expect(await store.listCandidates({ admin: true }, {})).toHaveLength(0);
   });
 
   it('rejects imports from non-admins', async () => {
