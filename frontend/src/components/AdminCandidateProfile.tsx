@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { CandidateProfile } from './eval/CandidateProfile';
+import { isOnlineTechLeadInterview } from '../data/techLeadProfiles';
 import type { Candidate, EvaluationWithScores, Panel, ResultRow, Vertical } from '../lib/types';
 
 interface ProfileScore {
@@ -69,7 +70,12 @@ export function AdminCandidateProfile({
       <div className="dialog wide" onClick={(e) => e.stopPropagation()}>
         <div className="profile-modal-head">
           <div>
-            <h3>{data?.candidate.full_name ?? 'Applicant profile'}</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <h3>{data?.candidate.full_name ?? 'Applicant profile'}</h3>
+              {data && isOnlineTechLeadInterview(data.candidate.email) && (
+                <span className="badge blue">Online Interview</span>
+              )}
+            </div>
             {data && (
               <p className="muted">
                 {[

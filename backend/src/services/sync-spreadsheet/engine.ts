@@ -204,13 +204,21 @@ function judgeRemarks(evaluations: EvaluationWithScores[]): Map<string, string[]
   return remarks;
 }
 
-/** Columns M-T: the evaluation block shared by exports and queue pushes. */
+export function interviewStatusFor(row: ResultRow | undefined): 'completed' | 'pending' {
+  return row && (row.interview_status === 'completed' || row.evaluation_count >= 2)
+    ? 'completed'
+    : 'pending';
+}
+
+/** Columns M-U: the evaluation block shared by exports and queue pushes. */
 function evaluationValues(
   row: ResultRow | undefined,
   preferences: string[],
   remarks: string[],
 ): unknown[] {
-  if (!row) return ['', '', '', '', '', '', preferences.join(', '), remarks.join('\n')];
+  if (!row) {
+    return ['', '', '', '', '', '', preferences.join(', '), remarks.join('\n'), 'pending'];
+  }
   const judgeCount = row.judge_ratings.length;
   const individualScores = row.judge_ratings.map((j) => (j.score === null ? '' : Number(j.score)));
   return [
@@ -222,6 +230,7 @@ function evaluationValues(
     judgeCount,
     preferences.join(', '),
     remarks.join('\n'),
+    interviewStatusFor(row),
   ];
 }
 
@@ -264,6 +273,7 @@ const EVAL_HEADER = [
   'judge_count',
   'preferred_vertical_interview',
   'judge_remarks_interview',
+  'interview_status',
 ];
 
 interface PushPlan {
@@ -491,6 +501,7 @@ export const APPLICANT_EXPORT_HEADER = [
   'Judge Count',
   'Preferred Vertical (Interview)',
   'Judge Remarks (Interview)',
+  'Interview Status',
 ];
 
 export interface ExportSummary {

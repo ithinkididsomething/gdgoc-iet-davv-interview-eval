@@ -7,7 +7,11 @@ import {
   sanitizeTabTitle,
   spreadsheetUrl,
 } from '../src/services/sheets/googleSheets.js';
-import { APPLICANT_EXPORT_HEADER } from '../src/services/sync-spreadsheet/engine.js';
+import {
+  APPLICANT_EXPORT_HEADER,
+  interviewStatusFor,
+} from '../src/services/sync-spreadsheet/engine.js';
+import type { ResultRow } from '../src/store/types.js';
 
 const ID = '1hVKgXoxD4XrDQIey619gqlRfRtduVu5LqwzB5BmE4Bo';
 
@@ -67,9 +71,18 @@ describe('Applicant export helpers', () => {
       'judge_count',
       'preferred_vertical_interview',
       'judge_remarks_interview',
+      'interview_status',
     ]) {
       expect(columnIndex(APPLICANT_EXPORT_HEADER, [field])).not.toBeNull();
     }
     expect(new Set(APPLICANT_EXPORT_HEADER).size).toBe(APPLICANT_EXPORT_HEADER.length);
+  });
+
+  it('marks interviews completed after two evaluations or an explicit completion', () => {
+    const base = { interview_status: 'scheduled', evaluation_count: 1 } as ResultRow;
+    expect(interviewStatusFor(undefined)).toBe('pending');
+    expect(interviewStatusFor(base)).toBe('pending');
+    expect(interviewStatusFor({ ...base, evaluation_count: 2 })).toBe('completed');
+    expect(interviewStatusFor({ ...base, interview_status: 'completed' })).toBe('completed');
   });
 });

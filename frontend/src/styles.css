@@ -1264,6 +1264,35 @@ table.data th .th-sort.active .th-sort-icon {
   overflow-wrap: anywhere;
   line-height: 1.4;
 }
+.tech-lead-fields {
+  margin-top: 0.4rem;
+  border-top: 1px solid var(--border);
+}
+.tech-lead-field {
+  display: grid;
+  grid-template-columns: minmax(150px, 210px) minmax(0, 1fr);
+  gap: 0.35rem 1rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.tech-lead-field .extra-key {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.tech-lead-field .extra-value {
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+.tech-lead-field .extra-value a {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 720px) {
+  .tech-lead-field {
+    grid-template-columns: 1fr;
+  }
+}
 .profile-note {
   margin-top: 0.55rem;
   padding: 0.75rem 0.85rem;

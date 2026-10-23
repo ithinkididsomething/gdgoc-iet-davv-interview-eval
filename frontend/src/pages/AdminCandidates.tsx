@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth';
 import { ConfirmDialog } from '../components/Ui';
 import { AdminCandidateProfile } from '../components/AdminCandidateProfile';
 import { SortableTh, useSort } from '../components/Sortable';
+import { isOnlineTechLeadInterview } from '../data/techLeadProfiles';
 import type { Candidate, Panel } from '../lib/types';
 
 interface ImportSheetAudit {
@@ -339,6 +340,9 @@ export function AdminCandidates() {
                 <td>
                   <span className="badge neutral">{c.interview_status.replace('_', ' ')}</span>{' '}
                   <span className="badge blue">{c.shortlisting_status}</span>
+                  {isOnlineTechLeadInterview(c.email) && (
+                    <span className="badge blue">Online Interview</span>
+                  )}
                   {c.archived_at && <span className="badge err">archived</span>}
                 </td>
                 <td className="actions-cell">

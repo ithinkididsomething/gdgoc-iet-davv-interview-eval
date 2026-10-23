@@ -1,5 +1,26 @@
 import type { ReactNode } from 'react';
 import type { Candidate, TaskLink } from '../../lib/types';
+import { isOnlineTechLeadInterview, techLeadProfileFor } from '../../data/techLeadProfiles';
+
+function LinkedText({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(https?:\/\/[^\s]+)/g).map((part, i) => {
+        if (!/^https?:\/\//.test(part)) return <span key={i}>{part}</span>;
+        const trailing = part.match(/[.,;)\]]+$/)?.[0] ?? '';
+        const url = trailing ? part.slice(0, -trailing.length) : part;
+        return (
+          <span key={i}>
+            <a href={url} target="_blank" rel="noreferrer noopener">
+              {url}
+            </a>
+            {trailing}
+          </span>
+        );
+      })}
+    </>
+  );
+}
 
 function LinkList({ links, empty }: { links: TaskLink[]; empty: string }) {
   if (!links || links.length === 0) return <span className="muted">{empty}</span>;
@@ -49,10 +70,13 @@ export function CandidateProfile({
   const extraEntries = Object.entries(candidate.source_extra ?? {}).filter(
     ([, v]) => v !== null && v !== undefined && String(v).trim() !== '',
   );
+  const techLeadProfile = verticalName === 'Tech Leads' ? techLeadProfileFor(candidate.email) : null;
+  const onlineInterview = isOnlineTechLeadInterview(candidate.email);
   return (
     <details className="card profile-card" open>
       <summary>
         <strong>Applicant profile</strong>
+        {onlineInterview && <span className="badge blue">Online Interview</span>}
         <span className="muted"> Identity, links, and submitted work</span>
       </summary>
       <div className="profile-grid">
@@ -82,6 +106,21 @@ export function CandidateProfile({
         <Info label="Remarks" wide>
           <p style={{ margin: 0 }}>{candidate.remarks || <span className="muted">—</span>}</p>
         </Info>
+        {techLeadProfile && (
+          <div className="profile-wide">
+            <span className="label">Tech Lead application</span>
+            <div className="tech-lead-fields">
+              {techLeadProfile.fields.map((field, i) => (
+                <div className="tech-lead-field" key={`${field.label}-${i}`}>
+                  <span className="extra-key">{field.label}</span>
+                  <span className="extra-value">
+                    <LinkedText text={field.value} />
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {extraEntries.length > 0 && (
           <div className="profile-wide">
             <span className="label">Workbook columns (other)</span>
